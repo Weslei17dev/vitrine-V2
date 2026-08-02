@@ -14,4 +14,4 @@
 
      window.API_BASE_URL = 'http://localhost:3000';
    ============================================================================ */
-window.API_BASE_URL = 'https://SUA-API-AQUI.onrender.com';
+window.API_BASE_URL = 'https://vitrine-v2.onrender.com';
