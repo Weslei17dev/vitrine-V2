@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brincar de Desejo — Loja &amp; Painel Administrativo</title>
+
+<!-- Ícones -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<!-- Tipografia -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<!-- Gerador de QR Code (usado para exibir o "QR Code PIX" simulado) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     CABEÇALHO DA LOJA (visível para visitante e cliente logado;
+     escondido quando o admin está usando o painel)
+============================================================= -->
+<header id="site-header" class="site-header">
+  <div class="site-header__inner">
+    <a href="#" class="brand" data-nav="store">
+      <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
+      <span class="brand__name">Brincar de Desejo</span>
+    </a>
+
+    <nav id="header-nav-links" class="header-nav">
+      <a href="#" data-nav="store"><i class="fa-solid fa-store"></i> Produtos</a>
+      <a href="#" data-nav="customer-orders" id="nav-my-orders" class="is-hidden"><i class="fa-solid fa-receipt"></i> Meus Pedidos</a>
+    </nav>
+
+    <div class="header-actions">
+      <div id="header-guest-actions" class="header-guest-actions">
+        <button class="btn btn--ghost btn--sm" data-action="go-login">Entrar</button>
+        <button class="btn btn--primary btn--sm" data-action="go-register">Criar Conta</button>
+      </div>
+
+      <div id="header-client-actions" class="header-client-actions is-hidden">
+        <button id="open-cart-btn" class="icon-btn" aria-label="Abrir carrinho">
+          <i class="fa-solid fa-cart-shopping"></i>
+          <span id="cart-count-badge" class="count-badge is-hidden">0</span>
+        </button>
+        <div class="user-chip">
+          <i class="fa-solid fa-circle-user"></i>
+          <span id="header-user-name">Cliente</span>
+        </div>
+        <button class="btn btn--outline btn--sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sair
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================
+     VIEW: LOGIN
+============================================================= -->
+<section id="view-login" class="view auth-view">
+  <div class="auth-layout">
+    <div class="auth-panel">
+      <div class="auth-panel__content">
+        <span class="brand brand--light">
+          <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
+          <span class="brand__name">Brincar de Desejo</span>
+        </span>
+        <h1>Faça login para finalizar sua compra com privacidade.</h1>
+        <p>Navegue pelo catálogo livremente. Ao fazer login, você paga por PIX, acompanha seu pedido em tempo real e recebe tudo com embalagem 100% discreta.</p>
+        <ul class="auth-panel__features">
+          <li><i class="fa-solid fa-qrcode"></i> Pagamento via PIX com QR Code</li>
+          <li><i class="fa-solid fa-truck-fast"></i> Rastreio do pedido passo a passo</li>
+          <li><i class="fa-solid fa-user-secret"></i> Embalagem sem identificação da loja</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="auth-form-wrap">
+      <form id="form-login" class="auth-form" novalidate>
+        <h2>Entrar na sua conta</h2>
+        <p class="auth-form__subtitle">Acesse como cliente ou administrador.</p>
+
+        <div class="form-field">
+          <label for="login-email">E-mail</label>
+          <input id="login-email" name="email" type="email" placeholder="voce@email.com" autocomplete="username" required>
+        </div>
+
+        <div class="form-field">
+          <label for="login-password">Senha</label>
+          <input id="login-password" name="password" type="password" placeholder="Sua senha" autocomplete="current-password" required>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--block">
+          <i class="fa-solid fa-right-to-bracket"></i> Entrar
+        </button>
+
+        <p class="auth-form__hint">
+          <i class="fa-solid fa-circle-info"></i>
+          Teste como administrador: <strong>administrador@gmail.com</strong> / senha <strong>123</strong>
+        </p>
+
+        <p class="auth-form__switch">
+          Ainda não tem conta? <a href="#" data-action="go-register">Cadastre-se</a>
+        </p>
+        <p class="auth-form__switch">
+          <a href="#" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Continuar vendo os produtos</a>
+        </p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VIEW: CADASTRO DE CLIENTE
+============================================================= -->
+<section id="view-register" class="view auth-view">
+  <div class="auth-layout">
+    <div class="auth-panel">
+      <div class="auth-panel__content">
+        <span class="brand brand--light">
+          <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
+          <span class="brand__name">Brincar de Desejo</span>
+        </span>
+        <h1>Crie sua conta e finalize sua compra.</h1>
+        <p>Leva menos de um minuto. Depois disso você já pode adicionar produtos ao carrinho e finalizar pedidos com total discrição.</p>
+      </div>
+    </div>
+
+    <div class="auth-form-wrap">
+      <form id="form-register" class="auth-form auth-form--wide" novalidate>
+        <h2>Criar conta de cliente</h2>
+        <p class="auth-form__subtitle">Preencha seus dados para cadastro.</p>
+
+        <div class="form-grid">
+          <div class="form-field form-field--span2">
+            <label for="reg-name">Nome completo</label>
+            <input id="reg-name" name="name" type="text" placeholder="Seu nome completo" required>
+          </div>
+
+          <div class="form-field">
+            <label for="reg-cpf">CPF <span class="optional-tag">(opcional)</span></label>
+            <input id="reg-cpf" name="cpf" type="text" placeholder="000.000.000-00">
+          </div>
+
+          <div class="form-field">
+            <label for="reg-phone">Telefone</label>
+            <input id="reg-phone" name="phone" type="text" placeholder="(00) 00000-0000" required>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label for="reg-email">E-mail</label>
+            <input id="reg-email" name="email" type="email" placeholder="voce@email.com" autocomplete="username" required>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label for="reg-password">Senha</label>
+            <input id="reg-password" name="password" type="password" placeholder="Crie uma senha" autocomplete="new-password" required>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label for="reg-address">Endereço</label>
+            <input id="reg-address" name="address" type="text" placeholder="Rua, número, bairro" required>
+          </div>
+
+          <div class="form-field">
+            <label for="reg-city">Cidade</label>
+            <input id="reg-city" name="city" type="text" placeholder="Sua cidade" required>
+          </div>
+
+          <div class="form-field">
+            <label for="reg-state">Estado</label>
+            <input id="reg-state" name="state" type="text" placeholder="UF" maxlength="2" style="text-transform:uppercase" required>
+          </div>
+
+          <div class="form-field">
+            <label for="reg-zip">CEP</label>
+            <input id="reg-zip" name="zip" type="text" placeholder="00000-000" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn--primary btn--block">
+          <i class="fa-solid fa-user-plus"></i> Criar Conta
+        </button>
+
+        <p class="auth-form__switch">
+          Já tem conta? <a href="#" data-action="go-login">Fazer login</a>
+        </p>
+        <p class="auth-form__switch">
+          <a href="#" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Continuar vendo os produtos</a>
+        </p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VIEW: LOJA (catálogo de produtos)
+============================================================= -->
+<section id="view-store" class="view">
+
+  <!-- Barra utilitária de contato -->
+  <div class="store-utility-bar">
+    <div class="store-utility-bar__inner">
+      <a href="tel:+551148106810"><i class="fa-solid fa-phone"></i> (11) 4810-6810</a>
+      <span class="store-utility-bar__sep">·</span>
+      <span><i class="fa-solid fa-headset"></i> Central de Atendimento</span>
+      <span class="store-utility-bar__right"><i class="fa-solid fa-user-secret"></i> Sua compra é 100% discreta</span>
+    </div>
+  </div>
+
+  <!-- Faixa de benefícios -->
+  <div class="store-perks-bar">
+    <div class="store-perks-bar__inner">
+      <div class="store-perk"><i class="fa-solid fa-box"></i> Embalagem sem identificação</div>
+      <div class="store-perk"><i class="fa-solid fa-truck-fast"></i> Frete grátis acima de R$250</div>
+      <div class="store-perk"><i class="fa-solid fa-credit-card"></i> 10x sem juros no cartão</div>
+      <div class="store-perk"><i class="fa-solid fa-qrcode"></i> Pague com PIX na hora</div>
+    </div>
+  </div>
+
+  <!-- Banner principal -->
+  <div class="store-hero-banner">
+    <div class="store-hero-banner__decor" aria-hidden="true"></div>
+    <div class="store-hero-banner__inner">
+      <span class="store-hero-banner__eyebrow" id="hero-eyebrow">Bem-vindo(a) à Brincar de Desejo</span>
+      <h1 id="hero-title">Desejo, prazer e sedução<br>em um só lugar.</h1>
+      <p id="hero-subtitle">Produtos selecionados com cuidado, entrega discreta e atendimento sem julgamentos. Veja o catálogo à vontade — o login só é pedido na hora de fechar o pedido.</p>
+      <a href="#product-grid-anchor" class="btn btn--accent btn--lg">
+        <i class="fa-solid fa-fire"></i> <span id="hero-cta-text">Ver produtos</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Carrossel de promoções (conteúdo carregado dinamicamente via js/siteContent.js) -->
+  <div class="promo-carousel-wrap">
+    <div class="promo-carousel" id="promo-carousel"></div>
+  </div>
+
+  <div class="page-container">
+
+    <!-- Selos de confiança -->
+    <div class="trust-row">
+      <div class="trust-item"><i class="fa-solid fa-user-secret"></i><span>Privacidade Total</span></div>
+      <div class="trust-item"><i class="fa-solid fa-box-open"></i><span>Embalagem Discreta</span></div>
+      <div class="trust-item"><i class="fa-solid fa-bolt"></i><span>Entrega Rápida</span></div>
+      <div class="trust-item"><i class="fa-solid fa-shield-heart"></i><span>Pagamento Seguro</span></div>
+    </div>
+
+    <!-- Produtos em destaque (mais vendidos) -->
+    <div class="section-heading">
+      <h2><i class="fa-solid fa-fire"></i> Mais Vendidos</h2>
+      <p>Os produtos em destaque, favoritos entre os nossos clientes.</p>
+    </div>
+    <div id="featured-products-grid" class="featured-grid"></div>
+
+    <!-- Destaque de produto (foto + texto) -->
+    <div class="product-spotlight">
+      <div class="product-spotlight__image">
+        <img id="spotlight-image" src="img/promo-dessensibilizante.jpg" alt="Dessensibilizante Cliv Intt — conforto é prioridade">
+      </div>
+      <div class="product-spotlight__content">
+        <span class="section-eyebrow" id="spotlight-eyebrow">Mais vendido da semana</span>
+        <h2 id="spotlight-title">Dessensibilizante — conforto é prioridade</h2>
+        <p id="spotlight-text">Pensado para iniciantes ou amadores, prolonga o prazer com uma fórmula suave que não tira a sensibilidade. Aplicação simples e absorção rápida, para uma experiência mais confortável a dois.</p>
+        <a href="#product-grid-anchor" class="btn btn--primary"><i class="fa-solid fa-cart-plus"></i> <span id="spotlight-button-text">Ver produtos relacionados</span></a>
+      </div>
+    </div>
+
+    <!-- Como comprar -->
+    <div class="section-heading section-heading--center">
+      <h2>Como comprar</h2>
+      <p>Simples, rápido e 100% discreto do início ao fim.</p>
+    </div>
+    <div class="how-it-works">
+      <div class="how-step">
+        <span class="how-step__number">1</span>
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <h3>Escolha os produtos</h3>
+        <p>Navegue pelo catálogo à vontade, sem precisar criar conta.</p>
+      </div>
+      <div class="how-step">
+        <span class="how-step__number">2</span>
+        <i class="fa-solid fa-cart-shopping"></i>
+        <h3>Monte seu carrinho</h3>
+        <p>Adicione quantos produtos quiser e ajuste as quantidades.</p>
+      </div>
+      <div class="how-step">
+        <span class="how-step__number">3</span>
+        <i class="fa-solid fa-user-lock"></i>
+        <h3>Faça login</h3>
+        <p>Login ou cadastro rápido só é pedido na hora de fechar o pedido.</p>
+      </div>
+      <div class="how-step">
+        <span class="how-step__number">4</span>
+        <i class="fa-solid fa-qrcode"></i>
+        <h3>Pague com PIX</h3>
+        <p>Escaneie o QR Code e receba tudo em embalagem 100% discreta.</p>
+      </div>
+    </div>
+
+    <!-- Oferta relâmpago -->
+    <div class="flash-sale-banner">
+      <div class="flash-sale-banner__info">
+        <span class="flash-sale-banner__tag"><i class="fa-solid fa-bolt"></i> <span id="flash-sale-tag">Oferta Relâmpago</span></span>
+        <h2 id="flash-sale-title">Aproveite antes que acabe!</h2>
+        <p id="flash-sale-description">Selecionamos os itens mais desejados com condições especiais por tempo limitado.</p>
+      </div>
+      <div class="flash-sale-banner__timer" id="flash-sale-countdown" aria-label="Tempo restante da oferta">
+        <div class="flash-sale-banner__timer-box"><span data-timer="hours">00</span><small>h</small></div>
+        <div class="flash-sale-banner__timer-box"><span data-timer="minutes">00</span><small>min</small></div>
+        <div class="flash-sale-banner__timer-box"><span data-timer="seconds">00</span><small>s</small></div>
+      </div>
+    </div>
+
+    <div id="product-grid-anchor" class="store-hero">
+      <div>
+        <h1>Catálogo de produtos</h1>
+        <p>Escolha seus produtos favoritos e adicione ao carrinho.</p>
+      </div>
+      <div class="store-hero__search">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input id="product-search" type="text" placeholder="Buscar produto...">
+      </div>
+    </div>
+
+    <div id="category-filters" class="chip-list"></div>
+
+    <div id="product-grid" class="product-grid"></div>
+
+    <!-- Como funciona o processo do pedido -->
+    <div class="section-heading section-heading--center">
+      <h2>Como funciona seu pedido</h2>
+      <p>Acompanhe cada etapa, do clique em "comprar" até a entrega na sua casa.</p>
+    </div>
+    <ol class="order-process">
+      <li class="order-process__step">
+        <span class="order-process__icon"><i class="fa-solid fa-cart-shopping"></i></span>
+        <h3>Pedido realizado</h3>
+        <p>Você monta o carrinho, faz login e confirma os dados de entrega.</p>
+      </li>
+      <li class="order-process__step">
+        <span class="order-process__icon"><i class="fa-solid fa-circle-check"></i></span>
+        <h3>Pedido aprovado</h3>
+        <p>Pague com PIX e a aprovação chega em poucos minutos.</p>
+      </li>
+      <li class="order-process__step">
+        <span class="order-process__icon"><i class="fa-solid fa-truck-fast"></i></span>
+        <h3>Pedido enviado</h3>
+        <p>Separamos tudo e enviamos com embalagem 100% discreta.</p>
+      </li>
+      <li class="order-process__step">
+        <span class="order-process__icon"><i class="fa-solid fa-house"></i></span>
+        <h3>Pedido entregue</h3>
+        <p>Seu pedido chega até você, sem identificação da loja.</p>
+      </li>
+    </ol>
+
+    <!-- Quem somos -->
+    <div class="about-section">
+      <div class="about-section__image">
+        <img id="about-image" src="img/quem-somos.jpg" alt="Brincar de Desejo — brinque com responsabilidade e segurança">
+      </div>
+      <div class="about-section__content">
+        <span class="section-eyebrow" id="about-eyebrow">Quem somos</span>
+        <h2 id="about-title">Prazer, autoconhecimento e liberdade — sem tabus.</h2>
+        <p id="about-paragraph-1">A Brincar de Desejo nasceu para tornar o universo da sexualidade mais leve, acessível e livre de julgamentos. Selecionamos cada produto com cuidado, pensando em conforto, qualidade e segurança para todos os corpos e desejos.</p>
+        <p id="about-paragraph-2">Da escolha à entrega, prezamos pela sua privacidade: embalagens sem identificação, atendimento humano e discrição do primeiro clique até a porta de casa.</p>
+        <ul class="about-section__list" id="about-bullets"></ul>
+      </div>
+    </div>
+
+    <!-- Perguntas frequentes -->
+    <div class="section-heading section-heading--center">
+      <h2>Perguntas Frequentes</h2>
+      <p>Tudo o que você precisa saber antes de comprar.</p>
+    </div>
+    <div class="faq" id="faq"></div>
+  </div>
+
+  <!-- Rodapé institucional -->
+  <footer class="store-footer">
+    <div class="store-footer__inner">
+      <div class="store-footer__col store-footer__col--brand">
+        <span class="brand brand--light">
+          <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
+          <span class="brand__name">Brincar de Desejo</span>
+        </span>
+        <p id="footer-about">Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.</p>
+        <div class="store-footer__social">
+          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
+          <a href="#" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
+          <a href="#" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a>
+        </div>
+      </div>
+
+      <div class="store-footer__col">
+        <h3>Institucional</h3>
+        <ul>
+          <li><a href="#">Quem Somos</a></li>
+          <li><a href="#">Política de Privacidade</a></li>
+          <li><a href="#">Trocas e Devoluções</a></li>
+          <li><a href="#">Compra Segura</a></li>
+        </ul>
+      </div>
+
+      <div class="store-footer__col">
+        <h3>Atendimento</h3>
+        <ul>
+          <li><i class="fa-solid fa-phone"></i> <span id="footer-phone">(11) 4810-6810</span></li>
+          <li><i class="fa-solid fa-envelope"></i> <span id="footer-email">sac@brincardedesejo.com.br</span></li>
+          <li id="footer-hours-1">Seg. a Sex. das 8h às 18h</li>
+          <li id="footer-hours-2">Sábados das 8h às 12h</li>
+        </ul>
+      </div>
+
+      <div class="store-footer__col">
+        <h3>Formas de pagamento</h3>
+        <div class="store-footer__payments">
+          <span><i class="fa-solid fa-qrcode"></i> PIX</span>
+          <span><i class="fa-brands fa-cc-visa"></i></span>
+          <span><i class="fa-brands fa-cc-mastercard"></i></span>
+          <span><i class="fa-solid fa-credit-card"></i></span>
+        </div>
+        <h3 class="store-footer__seals-title">Segurança</h3>
+        <div class="store-footer__seals">
+          <span><i class="fa-solid fa-lock"></i> Site Seguro</span>
+          <span><i class="fa-solid fa-user-secret"></i> Envio Discreto</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="store-footer__bottom">
+      <p>Brincar de Desejo — Todos os direitos reservados. Venda proibida para menores de 18 anos.</p>
+    </div>
+  </footer>
+</section>
+
+<!-- ============================================================
+     VIEW: DETALHE DO PRODUTO (galeria, avaliações, relacionados)
+============================================================= -->
+<section id="view-product-detail" class="view">
+  <div class="page-container pd-page">
+    <button class="pd-back-link" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Voltar aos produtos</button>
+
+    <div class="pd-layout">
+      <div class="pd-gallery">
+        <div class="pd-gallery__main" id="pd-main-image"></div>
+        <div class="pd-gallery__thumbs" id="pd-thumbs"></div>
+      </div>
+
+      <div class="pd-info">
+        <span class="pd-info__category" id="pd-category"></span>
+        <h1 id="pd-name"></h1>
+
+        <div class="pd-info__rating">
+          <span class="pd-stars" id="pd-rating-stars"></span>
+          <span class="pd-rating-summary" id="pd-rating-summary"></span>
+        </div>
+
+        <p class="pd-info__price" id="pd-price"></p>
+        <p class="pd-info__description" id="pd-description"></p>
+
+        <div class="pd-details-block is-hidden">
+          <h3>Informações adicionais</h3>
+          <p id="pd-details"></p>
+        </div>
+
+        <button id="pd-add-btn" class="btn btn--primary btn--lg" data-action="add-to-cart">
+          <i class="fa-solid fa-cart-plus"></i> Adicionar ao carrinho
+        </button>
+      </div>
+    </div>
+
+    <!-- Avaliações -->
+    <div class="pd-reviews">
+      <div class="section-heading">
+        <h2><i class="fa-solid fa-star"></i> Avaliações</h2>
+      </div>
+
+      <form id="form-review" class="pd-review-form">
+        <h3>Deixe sua avaliação</h3>
+        <div class="pd-review-form__stars" id="pd-review-stars-input">
+          <button type="button" data-value="1" aria-label="1 estrela"><i class="fa-solid fa-star"></i></button>
+          <button type="button" data-value="2" aria-label="2 estrelas"><i class="fa-solid fa-star"></i></button>
+          <button type="button" data-value="3" aria-label="3 estrelas"><i class="fa-solid fa-star"></i></button>
+          <button type="button" data-value="4" aria-label="4 estrelas"><i class="fa-solid fa-star"></i></button>
+          <button type="button" data-value="5" aria-label="5 estrelas"><i class="fa-solid fa-star"></i></button>
+        </div>
+        <textarea id="pd-review-comment" rows="3" placeholder="Conte o que você achou do produto..." required></textarea>
+        <button type="submit" class="btn btn--outline btn--sm"><i class="fa-solid fa-paper-plane"></i> Enviar avaliação</button>
+      </form>
+
+      <div id="pd-reviews-list" class="pd-reviews-list"></div>
+    </div>
+
+    <!-- Produtos relacionados -->
+    <div class="section-heading">
+      <h2>Você também pode gostar</h2>
+    </div>
+    <div id="pd-related-grid" class="product-grid"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VIEW: ÁREA DO CLIENTE (histórico de pedidos)
+============================================================= -->
+<section id="view-customer-orders" class="view">
+  <div class="page-container">
+    <div class="page-header">
+      <h1>Meus Pedidos</h1>
+      <p>Acompanhe o status de cada pedido em tempo real.</p>
+    </div>
+
+    <div class="kpi-row kpi-row--3">
+      <div class="kpi-card">
+        <div class="kpi-card__icon" style="--kpi-color:var(--color-primary)"><i class="fa-solid fa-receipt"></i></div>
+        <div><span class="kpi-card__value" id="customer-summary-total-orders">0</span><span class="kpi-card__label">Pedidos</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card__icon" style="--kpi-color:var(--color-success)"><i class="fa-solid fa-sack-dollar"></i></div>
+        <div><span class="kpi-card__value" id="customer-summary-total-spent">R$ 0,00</span><span class="kpi-card__label">Total gasto</span></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card__icon" style="--kpi-color:var(--color-warning)"><i class="fa-solid fa-hourglass-half"></i></div>
+        <div><span class="kpi-card__value" id="customer-summary-pending">0</span><span class="kpi-card__label">Pendentes</span></div>
+      </div>
+    </div>
+
+    <div id="customer-orders-list" class="orders-list"></div>
+  </div>
+</section>
+
+<!-- ============================================================
+     VIEW: PAINEL ADMINISTRATIVO
+============================================================= -->
+<section id="view-admin" class="view">
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <a href="#" class="brand brand--light" data-nav="admin">
+        <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
+        <span class="brand__name">Brincar de Desejo</span>
+      </a>
+      <span class="admin-sidebar__tag">Painel Administrativo</span>
+
+      <nav class="admin-nav">
+        <button class="admin-nav__item is-active" data-admin-tab="dashboard">
+          <i class="fa-solid fa-chart-line"></i> Dashboard
+        </button>
+        <button class="admin-nav__item" data-admin-tab="clientes">
+          <i class="fa-solid fa-users"></i> Clientes
+        </button>
+        <button class="admin-nav__item" data-admin-tab="pedidos">
+          <i class="fa-solid fa-clipboard-list"></i> Pedidos
+        </button>
+        <button class="admin-nav__item" data-admin-tab="produtos">
+          <i class="fa-solid fa-boxes-stacked"></i> Produtos
+        </button>
+        <button class="admin-nav__item" data-admin-tab="personalizar">
+          <i class="fa-solid fa-palette"></i> Personalizar
+        </button>
+      </nav>
+
+      <button class="btn btn--outline btn--sm admin-sidebar__logout" data-action="logout">
+        <i class="fa-solid fa-right-from-bracket"></i> Sair
+      </button>
+    </aside>
+
+    <main class="admin-main">
+      <div class="admin-topbar">
+        <h1 id="admin-topbar-title">Painel Administrativo</h1>
+        <button id="admin-notif-bell" class="icon-btn" aria-label="Notificações">
+          <i class="fa-solid fa-bell"></i>
+          <span id="admin-notif-badge" class="count-badge is-hidden">0</span>
+        </button>
+      </div>
+
+      <!-- ---------- DASHBOARD ---------- -->
+      <div class="admin-tab-panel is-active" data-tab-panel="dashboard">
+        <div class="kpi-row kpi-row--5">
+          <div class="kpi-card">
+            <div class="kpi-card__icon" style="--kpi-color:var(--color-primary)"><i class="fa-solid fa-clipboard-list"></i></div>
+            <div><span class="kpi-card__value" id="admin-kpi-total-orders">0</span><span class="kpi-card__label">Total de pedidos</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__icon" style="--kpi-color:var(--color-success)"><i class="fa-solid fa-sack-dollar"></i></div>
+            <div><span class="kpi-card__value" id="admin-kpi-revenue">R$ 0,00</span><span class="kpi-card__label">Total faturado</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__icon" style="--kpi-color:var(--color-warning)"><i class="fa-solid fa-hourglass-half"></i></div>
+            <div><span class="kpi-card__value" id="admin-kpi-pending">0</span><span class="kpi-card__label">Pedidos pendentes</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__icon" style="--kpi-color:var(--color-info)"><i class="fa-solid fa-circle-check"></i></div>
+            <div><span class="kpi-card__value" id="admin-kpi-paid">0</span><span class="kpi-card__label">Pedidos pagos</span></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-card__icon" style="--kpi-color:var(--color-accent-dark)"><i class="fa-solid fa-users"></i></div>
+            <div><span class="kpi-card__value" id="admin-kpi-customers">0</span><span class="kpi-card__label">Clientes cadastrados</span></div>
+          </div>
+        </div>
+
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-clock-rotate-left"></i> Pedidos recentes</h2>
+          <div id="admin-recent-orders" class="recent-orders"></div>
+        </div>
+      </div>
+
+      <!-- ---------- CLIENTES ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="clientes">
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-users"></i> Clientes cadastrados</h2>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Nome</th><th>Telefone</th><th>E-mail</th><th>Cidade</th><th>Total gasto</th></tr>
+              </thead>
+              <tbody id="admin-customers-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- PEDIDOS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="pedidos">
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-clipboard-list"></i> Todos os pedidos</h2>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th>Número</th><th>Cliente</th><th>Produtos</th><th>Valor</th><th>Data</th><th>Hora</th><th>Status</th><th></th></tr>
+              </thead>
+              <tbody id="admin-orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- PRODUTOS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="produtos">
+        <div class="panel-card">
+          <div class="panel-card__header">
+            <h2><i class="fa-solid fa-boxes-stacked"></i> Catálogo de produtos</h2>
+            <button id="new-product-btn" class="btn btn--primary btn--sm">
+              <i class="fa-solid fa-plus"></i> Novo Produto
+            </button>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr><th></th><th>Nome</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th></tr>
+              </thead>
+              <tbody id="admin-products-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- PERSONALIZAR ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="personalizar">
+        <form id="form-site-content">
+          <div class="personalize-header">
+            <p><i class="fa-solid fa-circle-info"></i> Tudo aqui aparece direto na loja assim que você salvar — sem precisar mexer em código.</p>
+            <div class="personalize-header__actions">
+              <button type="button" id="site-content-reset-btn" class="btn btn--outline btn--sm">
+                <i class="fa-solid fa-rotate-left"></i> Restaurar padrão
+              </button>
+              <button type="submit" class="btn btn--primary btn--sm">
+                <i class="fa-solid fa-check"></i> Salvar alterações
+              </button>
+            </div>
+          </div>
+
+          <!-- Tema e cores -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-swatchbook"></i> Tema e Cores</h2></div>
+            <p class="theme-hint">Defina cada cor do site. Fundos com transparência (badges, selos) são calculados automaticamente a partir dessas cores.</p>
+            <div class="theme-grid">
+              <div class="theme-field">
+                <label for="sc-theme-bg">Fundo da página</label>
+                <input id="sc-theme-bg" name="theme-bg" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-surface">Fundo dos cards</label>
+                <input id="sc-theme-surface" name="theme-surface" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-primary">Cor principal</label>
+                <input id="sc-theme-primary" name="theme-primary" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-primary-dark">Cor principal (escura)</label>
+                <input id="sc-theme-primary-dark" name="theme-primary-dark" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-accent">Cor de destaque</label>
+                <input id="sc-theme-accent" name="theme-accent" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-accent-dark">Cor de destaque (escura)</label>
+                <input id="sc-theme-accent-dark" name="theme-accent-dark" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-text">Cor do texto</label>
+                <input id="sc-theme-text" name="theme-text" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-text-muted">Cor do texto secundário</label>
+                <input id="sc-theme-text-muted" name="theme-text-muted" type="color">
+              </div>
+              <div class="theme-field">
+                <label for="sc-theme-dark">Fundo escuro (topo/rodapé)</label>
+                <input id="sc-theme-dark" name="theme-dark" type="color">
+              </div>
+            </div>
+          </div>
+
+          <!-- Chave Pix -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-qrcode"></i> Recebimento via Pix</h2></div>
+            <p class="theme-hint">O valor de cada pedido cai direto nesta chave. Teste com um pedido de valor baixo antes de divulgar a loja.</p>
+            <div class="form-grid">
+              <div class="form-field form-field--span2">
+                <label for="sc-pix-chave">Sua chave Pix (aleatória, CPF, CNPJ, e-mail ou telefone)</label>
+                <input id="sc-pix-chave" name="pix-chave" type="text">
+              </div>
+              <div class="form-field">
+                <label for="sc-pix-nome">Nome do beneficiário (máx. 25 caracteres)</label>
+                <input id="sc-pix-nome" name="pix-nome" type="text" maxlength="25">
+              </div>
+              <div class="form-field">
+                <label for="sc-pix-cidade">Cidade do beneficiário (máx. 15 caracteres)</label>
+                <input id="sc-pix-cidade" name="pix-cidade" type="text" maxlength="15">
+              </div>
+            </div>
+          </div>
+
+          <!-- Banner principal -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-flag"></i> Banner Principal</h2></div>
+            <div class="form-grid">
+              <div class="form-field form-field--span2">
+                <label for="sc-hero-eyebrow">Selo pequeno acima do título</label>
+                <input id="sc-hero-eyebrow" name="hero-eyebrow" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-hero-title">Título (use Enter para quebrar linha)</label>
+                <textarea id="sc-hero-title" name="hero-title" rows="2"></textarea>
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-hero-subtitle">Subtítulo</label>
+                <textarea id="sc-hero-subtitle" name="hero-subtitle" rows="2"></textarea>
+              </div>
+              <div class="form-field">
+                <label for="sc-hero-cta">Texto do botão</label>
+                <input id="sc-hero-cta" name="hero-cta" type="text">
+              </div>
+            </div>
+          </div>
+
+          <!-- Carrossel de banners -->
+          <div class="panel-card">
+            <div class="panel-card__header">
+              <h2><i class="fa-solid fa-images"></i> Carrossel de Banners</h2>
+              <button type="button" id="sc-carousel-add" class="btn btn--outline btn--sm"><i class="fa-solid fa-plus"></i> Adicionar slide</button>
+            </div>
+            <div id="sc-carousel-list" class="repeatable-list"></div>
+          </div>
+
+          <!-- Oferta relâmpago -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-bolt"></i> Oferta Relâmpago</h2></div>
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="sc-flash-tag">Selo</label>
+                <input id="sc-flash-tag" name="flash-tag" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-flash-title">Título</label>
+                <input id="sc-flash-title" name="flash-title" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-flash-description">Descrição</label>
+                <textarea id="sc-flash-description" name="flash-description" rows="2"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quem somos -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-heart"></i> Quem Somos</h2></div>
+            <div class="form-grid">
+              <div class="form-field form-field--span2">
+                <label>Imagem</label>
+                <div class="image-upload">
+                  <div class="image-upload__preview" id="sc-about-image-preview"><i class="fa-solid fa-image"></i></div>
+                  <div class="image-upload__actions">
+                    <label class="btn btn--outline btn--sm image-upload__btn">
+                      <i class="fa-solid fa-upload"></i> Trocar imagem
+                      <input type="file" id="sc-about-image-input" accept="image/*" class="image-upload__input">
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-about-eyebrow">Selo pequeno</label>
+                <input id="sc-about-eyebrow" name="about-eyebrow" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-about-title">Título</label>
+                <input id="sc-about-title" name="about-title" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-about-p1">Parágrafo 1</label>
+                <textarea id="sc-about-p1" name="about-p1" rows="3"></textarea>
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-about-p2">Parágrafo 2</label>
+                <textarea id="sc-about-p2" name="about-p2" rows="3"></textarea>
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-about-bullets">Lista de destaques (um por linha)</label>
+                <textarea id="sc-about-bullets" name="about-bullets" rows="3"></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Destaque de produto -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-star"></i> Destaque de Produto</h2></div>
+            <div class="form-grid">
+              <div class="form-field form-field--span2">
+                <label>Imagem</label>
+                <div class="image-upload">
+                  <div class="image-upload__preview" id="sc-spotlight-image-preview"><i class="fa-solid fa-image"></i></div>
+                  <div class="image-upload__actions">
+                    <label class="btn btn--outline btn--sm image-upload__btn">
+                      <i class="fa-solid fa-upload"></i> Trocar imagem
+                      <input type="file" id="sc-spotlight-image-input" accept="image/*" class="image-upload__input">
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-spotlight-eyebrow">Selo pequeno</label>
+                <input id="sc-spotlight-eyebrow" name="spotlight-eyebrow" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-spotlight-title">Título</label>
+                <input id="sc-spotlight-title" name="spotlight-title" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-spotlight-text">Texto</label>
+                <textarea id="sc-spotlight-text" name="spotlight-text" rows="3"></textarea>
+              </div>
+              <div class="form-field">
+                <label for="sc-spotlight-button">Texto do botão</label>
+                <input id="sc-spotlight-button" name="spotlight-button" type="text">
+              </div>
+            </div>
+          </div>
+
+          <!-- FAQ -->
+          <div class="panel-card">
+            <div class="panel-card__header">
+              <h2><i class="fa-solid fa-circle-question"></i> Perguntas Frequentes</h2>
+              <button type="button" id="sc-faq-add" class="btn btn--outline btn--sm"><i class="fa-solid fa-plus"></i> Adicionar pergunta</button>
+            </div>
+            <div id="sc-faq-list" class="repeatable-list"></div>
+          </div>
+
+          <!-- Rodapé -->
+          <div class="panel-card">
+            <div class="panel-card__header"><h2><i class="fa-solid fa-shop"></i> Rodapé</h2></div>
+            <div class="form-grid">
+              <div class="form-field form-field--span2">
+                <label for="sc-footer-about">Texto sobre a loja</label>
+                <textarea id="sc-footer-about" name="footer-about" rows="2"></textarea>
+              </div>
+              <div class="form-field">
+                <label for="sc-footer-phone">Telefone</label>
+                <input id="sc-footer-phone" name="footer-phone" type="text">
+              </div>
+              <div class="form-field">
+                <label for="sc-footer-email">E-mail</label>
+                <input id="sc-footer-email" name="footer-email" type="text">
+              </div>
+              <div class="form-field">
+                <label for="sc-footer-hours1">Horário 1</label>
+                <input id="sc-footer-hours1" name="footer-hours1" type="text">
+              </div>
+              <div class="form-field">
+                <label for="sc-footer-hours2">Horário 2</label>
+                <input id="sc-footer-hours2" name="footer-hours2" type="text">
+              </div>
+            </div>
+          </div>
+
+          <div class="personalize-footer-actions">
+            <button type="submit" class="btn btn--primary"><i class="fa-solid fa-check"></i> Salvar alterações</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============================================================
+     MODAL: CARRINHO (drawer lateral)
+============================================================= -->
+<div id="modal-cart" class="modal modal--drawer">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__drawer">
+    <div class="modal__header">
+      <h2><i class="fa-solid fa-cart-shopping"></i> Seu Carrinho</h2>
+      <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="modal__body">
+      <div id="cart-empty-state" class="empty-state">
+        <i class="fa-solid fa-cart-shopping"></i>
+        <p>Seu carrinho está vazio.</p>
+      </div>
+      <div id="cart-items-list" class="cart-items-list"></div>
+    </div>
+
+    <div id="cart-footer" class="modal__footer cart-footer is-hidden">
+      <div class="cart-total-row">
+        <span>Total</span>
+        <strong id="cart-total">R$ 0,00</strong>
+      </div>
+      <div class="cart-footer__actions">
+        <button id="clear-cart-btn" class="btn btn--outline btn--block">
+          <i class="fa-solid fa-trash"></i> Limpar Carrinho
+        </button>
+        <button id="go-checkout-btn" class="btn btn--primary btn--block">
+          <i class="fa-solid fa-arrow-right"></i> Finalizar Pedido
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: FINALIZAÇÃO DO PEDIDO (revisão + pagamento PIX)
+============================================================= -->
+<div id="modal-checkout" class="modal">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog modal__dialog--wide">
+    <div class="modal__header">
+      <h2><i class="fa-solid fa-bag-shopping"></i> Finalizar Pedido</h2>
+      <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <div class="modal__body">
+      <!-- Passo 1: revisão dos dados -->
+      <div id="checkout-step-review">
+        <div id="checkout-review"></div>
+        <div class="modal__footer-actions">
+          <button id="checkout-back-btn" class="btn btn--outline" data-close-modal>Voltar</button>
+          <button id="confirm-order-btn" class="btn btn--primary">
+            <i class="fa-solid fa-check"></i> Confirmar Pedido
+          </button>
+        </div>
+      </div>
+
+      <!-- Passo 2: pagamento PIX -->
+      <div id="checkout-step-payment" class="is-hidden">
+        <div class="pix-payment">
+          <p class="pix-payment__intro">
+            Pedido <strong id="payment-order-number">#000000</strong> gerado com sucesso!
+            Escaneie o QR Code abaixo no app do seu banco para pagar via PIX.
+          </p>
+          <div id="pix-qrcode-holder" class="pix-qrcode-holder"></div>
+          <button id="pix-copy-btn" type="button" class="btn btn--outline btn--sm pix-copy-btn">
+            <i class="fa-solid fa-copy"></i> Copiar código Pix
+          </button>
+          <p class="pix-payment__total">Valor a pagar: <strong id="payment-order-total">R$ 0,00</strong></p>
+          <p class="pix-payment__status">
+            <i class="fa-solid fa-clock"></i> Status: Aguardando Pagamento
+          </p>
+        </div>
+        <button id="payment-done-btn" class="btn btn--primary btn--block">
+          <i class="fa-solid fa-money-check-dollar"></i> Já realizei o pagamento
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: DETALHE DO PEDIDO (usado pelo cliente e pelo admin)
+============================================================= -->
+<div id="modal-order-detail" class="modal">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog modal__dialog--wide">
+    <div class="modal__header">
+      <h2><i class="fa-solid fa-receipt"></i> Detalhe do Pedido</h2>
+      <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal__body">
+      <div id="order-detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     MODAL: FORMULÁRIO DE PRODUTO (admin — criar/editar)
+============================================================= -->
+<div id="modal-product-form" class="modal">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog">
+    <div class="modal__header">
+      <h2 id="product-form-title"><i class="fa-solid fa-box"></i> Novo Produto</h2>
+      <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+
+    <form id="form-product">
+      <div class="modal__body">
+        <div class="form-grid">
+          <div class="form-field form-field--span2">
+            <label for="prod-name">Nome do produto</label>
+            <input id="prod-name" name="name" type="text" required>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label for="prod-description">Descrição</label>
+            <textarea id="prod-description" name="description" rows="2" required></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="prod-price">Valor (R$)</label>
+            <input id="prod-price" name="price" type="number" min="0" step="0.01" required>
+          </div>
+
+          <div class="form-field">
+            <label for="prod-category">Categoria</label>
+            <input id="prod-category" name="category" type="text" placeholder="Ex: Eletrônicos" required>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label>Foto do produto (opcional — se não enviar, usa o ícone/cor abaixo)</label>
+            <div class="image-upload">
+              <div class="image-upload__preview" id="prod-image-preview">
+                <i class="fa-solid fa-image"></i>
+              </div>
+              <div class="image-upload__actions">
+                <label class="btn btn--outline btn--sm image-upload__btn">
+                  <i class="fa-solid fa-upload"></i> Enviar imagem
+                  <input type="file" id="prod-image-input" accept="image/*" class="image-upload__input">
+                </label>
+                <button type="button" id="prod-image-remove" class="btn btn--ghost btn--sm is-hidden">
+                  <i class="fa-solid fa-trash"></i> Remover
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label>Fotos adicionais (galeria da página do produto)</label>
+            <div id="prod-gallery-list" class="repeatable-list repeatable-list--gallery"></div>
+            <button type="button" id="prod-gallery-add" class="btn btn--outline btn--sm">
+              <i class="fa-solid fa-plus"></i> Adicionar foto
+            </button>
+          </div>
+
+          <div class="form-field form-field--span2">
+            <label for="prod-details">Informações adicionais (opcional — modo de uso, composição etc.)</label>
+            <textarea id="prod-details" name="details" rows="3"></textarea>
+          </div>
+
+          <div class="form-field">
+            <label for="prod-icon">Ícone (emoji)</label>
+            <input id="prod-icon" name="icon" type="text" placeholder="🛍️" maxlength="4">
+          </div>
+
+          <div class="form-field">
+            <label for="prod-color">Cor de destaque</label>
+            <input id="prod-color" name="color" type="color" value="#2A3B8F">
+          </div>
+
+          <div class="form-field">
+            <label for="prod-stock">Estoque</label>
+            <input id="prod-stock" name="stock" type="number" min="0" step="1" value="0">
+          </div>
+
+          <div class="form-field form-field--checkbox">
+            <label><input type="checkbox" name="active" checked> Produto ativo no catálogo</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal__footer">
+        <button type="button" class="btn btn--outline" data-close-modal>Cancelar</button>
+        <button type="submit" class="btn btn--primary"><i class="fa-solid fa-check"></i> Salvar Produto</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ============================================================
+     SCRIPTS (ordem importa: dataService/utils primeiro, app.js por último)
+============================================================= -->
+<script src="js/apiConfig.js"></script>
+<script src="js/dataService.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/siteContent.js"></script>
+<script src="js/products.js"></script>
+<script src="js/productDetail.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/orders.js"></script>
+<script src="js/customerArea.js"></script>
+<script src="js/adminPanel.js"></script>
+<script src="js/app.js"></script>
+
+<!-- ============================================================
+     Contador da faixa "Oferta Relâmpago" (puramente decorativo,
+     conta até a meia-noite local — não interfere em nenhum módulo)
+============================================================= -->
+<script>
+(function () {
+  'use strict';
+  function tick() {
+    const el = document.getElementById('flash-sale-countdown');
+    if (!el) return;
+    const now = new Date();
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const diff = Math.max(0, midnight - now);
+
+    const hours = Math.floor(diff / 3600000);
+    const minutes = Math.floor((diff % 3600000) / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+
+    const pad = (n) => String(n).padStart(2, '0');
+    const hoursEl = el.querySelector('[data-timer="hours"]');
+    const minutesEl = el.querySelector('[data-timer="minutes"]');
+    const secondsEl = el.querySelector('[data-timer="seconds"]');
+    if (hoursEl) hoursEl.textContent = pad(hours);
+    if (minutesEl) minutesEl.textContent = pad(minutes);
+    if (secondsEl) secondsEl.textContent = pad(seconds);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+</body>
+</html>
