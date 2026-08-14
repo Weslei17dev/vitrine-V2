@@ -19,8 +19,8 @@
   // --------------------------------------------------------------------------
   function galleryImages(product) {
     const images = [];
-    if (product.image) images.push(product.image);
-    if (Array.isArray(product.gallery)) images.push(...product.gallery.filter(Boolean));
+    if (Utils.safeImageSrc(product.image)) images.push(Utils.safeImageSrc(product.image));
+    if (Array.isArray(product.gallery)) images.push(...product.gallery.map(Utils.safeImageSrc).filter(Boolean));
     return images;
   }
 
@@ -32,11 +32,11 @@
     const images = galleryImages(product);
 
     function setMain(src) {
-      mainEl.innerHTML = `<img src="${src}" alt="${Utils.escapeHtml(product.name)}">`;
+      mainEl.innerHTML = `<img src="${Utils.escapeHtml(Utils.safeImageSrc(src))}" alt="${Utils.escapeHtml(product.name)}">`;
     }
 
     if (!images.length) {
-      mainEl.innerHTML = `<div class="pd-gallery__fallback" style="background:${product.color}22"><span>${product.icon || '🛍️'}</span></div>`;
+      mainEl.innerHTML = `<div class="pd-gallery__fallback" style="background:${Utils.safeColor(product.color)}22"><span>${Utils.escapeHtml(product.icon || '🛍️')}</span></div>`;
       thumbsEl.innerHTML = '';
       return;
     }
@@ -49,7 +49,7 @@
     }
 
     thumbsEl.innerHTML = images
-      .map((src, i) => `<button class="pd-thumb ${i === 0 ? 'is-active' : ''}" data-src="${src}"><img src="${src}" alt=""></button>`)
+      .map((src, i) => `<button class="pd-thumb ${i === 0 ? 'is-active' : ''}" data-src="${Utils.escapeHtml(src)}"><img src="${Utils.escapeHtml(src)}" alt=""></button>`)
       .join('');
 
     thumbsEl.querySelectorAll('.pd-thumb').forEach((btn) => {
@@ -79,7 +79,13 @@
     }
 
     const addBtn = document.getElementById('pd-add-btn');
-    if (addBtn) addBtn.dataset.id = product.id;
+    if (addBtn) {
+      addBtn.dataset.id = product.id;
+      addBtn.disabled = Number(product.stock) <= 0;
+      addBtn.innerHTML = Number(product.stock) <= 0
+        ? '<i class="fa-solid fa-ban"></i> Produto indisponível'
+        : '<i class="fa-solid fa-cart-plus"></i> Adicionar ao carrinho';
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -114,7 +120,7 @@
         (r) => `
       <div class="pd-review">
         <div class="pd-review__head">
-          <strong>${Utils.escapeHtml(r.authorName)}</strong>
+          <strong>${Utils.escapeHtml(r.authorName)}${r.verifiedPurchase ? ' · Compra verificada' : ''}</strong>
           <span class="pd-review__stars">${starsHtml(r.rating, false)}</span>
         </div>
         <p class="pd-review__date">${Utils.escapeHtml(r.date)}</p>
@@ -174,6 +180,7 @@
         setSelectedRating(5);
         loadReviews(currentProduct.id);
       })
+      .catch((err) => Utils.showToast(err.message, 'error'))
       .finally(() => {
         if (submitBtn) submitBtn.disabled = false;
       });
@@ -195,12 +202,13 @@
   // Produtos relacionados
   // --------------------------------------------------------------------------
   function relatedCardHtml(product) {
-    const imageHtml = product.image
-      ? `<img class="product-card__photo" src="${product.image}" alt="${Utils.escapeHtml(product.name)}">`
-      : `<span style="font-size:2.6rem">${product.icon || '🛍️'}</span>`;
+    const safeImage = Utils.safeImageSrc(product.image);
+    const imageHtml = safeImage
+      ? `<img class="product-card__photo" src="${Utils.escapeHtml(safeImage)}" alt="${Utils.escapeHtml(product.name)}" loading="lazy">`
+      : `<span style="font-size:2.6rem">${Utils.escapeHtml(product.icon || '🛍️')}</span>`;
     return `
       <article class="product-card" data-id="${product.id}">
-        <div class="product-card__image" style="background:${product.color}22;">
+        <div class="product-card__image" style="background:${Utils.safeColor(product.color)}22;">
           ${imageHtml}
           <span class="product-card__category">${Utils.escapeHtml(product.category)}</span>
         </div>
@@ -221,7 +229,8 @@
     const grid = document.getElementById('pd-related-grid');
     if (!grid) return;
 
-    DataService.Products.getAll().then((all) => {
+    const cached = global.ProductsModule ? global.ProductsModule.getCached() : [];
+    Promise.resolve(cached && cached.length ? cached : DataService.Products.getAll()).then((all) => {
       const active = all.filter((p) => p.id !== product.id && p.active !== false);
       const sameCategory = active.filter((p) => p.category === product.category);
       let related = sameCategory.slice(0, 4);

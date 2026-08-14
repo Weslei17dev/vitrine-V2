@@ -10,8 +10,11 @@ const { requireAdmin } = require('../auth-middleware');
 
 const router = express.Router();
 
-router.get('/', requireAdmin, async (req, res) => {
+router.get('/', requireAdmin, async (req, res, next) => {
   try {
+    const requestedLimit = Number.parseInt(req.query.limit, 10);
+    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : 200;
+    const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
     const result = await pool.query(`
       SELECT
         u.id, u.name, u.phone, u.email, u.city, u.state,
@@ -21,7 +24,8 @@ router.get('/', requireAdmin, async (req, res) => {
       WHERE u.role = 'client'
       GROUP BY u.id
       ORDER BY u.created_at DESC
-    `);
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
 
     res.json(
       result.rows.map((row) => ({
@@ -35,8 +39,7 @@ router.get('/', requireAdmin, async (req, res) => {
       }))
     );
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Erro ao buscar clientes.' });
+    next(err);
   }
 });
 

@@ -10,7 +10,7 @@
 (function (global) {
   'use strict';
 
-  let pendingCheckout = { items: [], total: 0 };
+  let pendingCheckout = { items: [], total: 0, idempotencyKey: null };
   let currentOrder = null;
 
   // --------------------------------------------------------------------------
@@ -59,7 +59,10 @@
   }
 
   function openCheckout(items, total) {
-    pendingCheckout = { items, total };
+    const idempotencyKey = global.crypto && global.crypto.randomUUID
+      ? global.crypto.randomUUID()
+      : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    pendingCheckout = { items, total, idempotencyKey };
     document.getElementById('checkout-step-review').classList.remove('is-hidden');
     document.getElementById('checkout-step-payment').classList.add('is-hidden');
     renderCheckoutReview(items, total);
@@ -75,10 +78,8 @@
     holder.innerHTML = '';
 
     // Usa a lib QRCode.js (carregada via CDN no index.html) para gerar um
-    // QR Code real a partir do payload PIX simulado.
-    // TODO INTEGRAÇÃO: substituir `order.pixPayload` pelo payload retornado
-    // por um provedor de pagamentos real (PSP) assim que o PIX automático
-    // for implementado no backend.
+    // QR Code PIX estático gerado pelo servidor. A confirmação do recebimento
+    // continua manual até a integração futura com um provedor de pagamentos.
     if (global.QRCode) {
       // eslint-disable-next-line no-new
       new global.QRCode(holder, {
@@ -94,7 +95,6 @@
   }
 
   function confirmCheckout() {
-    const user = global.App.state.currentUser;
     const confirmBtn = document.getElementById('confirm-order-btn');
 
     const orderItems = pendingCheckout.items.map((i) => ({
@@ -108,10 +108,8 @@
     confirmBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Gerando pedido...';
 
     DataService.Orders.create({
-      userId: user.id,
-      customerName: user.name,
       items: orderItems,
-      total: pendingCheckout.total
+      idempotencyKey: pendingCheckout.idempotencyKey
     })
       .then((order) => {
         currentOrder = order;
@@ -234,6 +232,12 @@
       </div>
 
       <p><strong>Cliente:</strong> ${Utils.escapeHtml(order.customerName)}</p>
+      ${order.shipping && order.shipping.address ? `
+        <div class="checkout-summary-box">
+          <p><strong>Entrega:</strong> ${Utils.escapeHtml(order.shipping.address || '')}</p>
+          <p>${Utils.escapeHtml(order.shipping.city || '')}/${Utils.escapeHtml(order.shipping.state || '')} · CEP ${Utils.escapeHtml(order.shipping.zip || '')}</p>
+          <p>Telefone: ${Utils.escapeHtml(order.shipping.phone || '')}</p>
+        </div>` : ''}
 
       ${buildStatusTimelineHtml(order)}
 

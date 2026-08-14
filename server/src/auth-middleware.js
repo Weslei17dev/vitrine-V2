@@ -7,31 +7,62 @@
    ============================================================================ */
 
 const jwt = require('jsonwebtoken');
+const pool = require('./db');
+const config = require('./config');
 
-function requireAuth(req, res, next) {
+function readToken(req) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  return header.startsWith('Bearer ') ? header.slice(7) : null;
+}
 
+async function authenticate(req) {
+  const token = readToken(req);
   if (!token) {
-    return res.status(401).json({ message: 'Faça login para continuar.' });
+    const error = new Error('Faça login para continuar.');
+    error.status = 401;
+    throw error;
   }
 
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = payload; // { id, name, email, role }
-    next();
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: config.jwtIssuer,
+      audience: config.jwtAudience
+    });
+    const result = await pool.query(
+      'SELECT id, name, email, role, cpf, phone, address, city, state, zip, token_version FROM users WHERE id = $1',
+      [payload.sub]
+    );
+    const user = result.rows[0];
+    if (!user || Number(user.token_version || 0) !== Number(payload.ver || 0)) throw new Error('revoked');
+    req.user = user;
+    return user;
   } catch (err) {
-    return res.status(401).json({ message: 'Sessão expirada. Faça login novamente.' });
+    const authError = new Error('Sessão expirada. Faça login novamente.');
+    authError.status = 401;
+    throw authError;
   }
 }
 
-function requireAdmin(req, res, next) {
-  requireAuth(req, res, () => {
+async function requireAuth(req, res, next) {
+  try {
+    await authenticate(req);
+    next();
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function requireAdmin(req, res, next) {
+  try {
+    await authenticate(req);
     if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Acesso restrito ao administrador.' });
     }
     next();
-  });
+  } catch (err) {
+    next(err);
+  }
 }
 
 module.exports = { requireAuth, requireAdmin };

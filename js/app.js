@@ -118,14 +118,15 @@
       global.CustomerAreaModule.startPolling();
     }
     if (view === 'admin') {
-      global.AdminPanelModule.loadAll();
+      global.AdminPanelModule.enter();
       global.AdminPanelModule.startPolling();
     }
   }
 
   function setCurrentUser(user) {
     state.currentUser = user;
-    global.CartModule.loadForCurrentUser();
+    if (user) global.CartModule.migrateGuestCart(user.id);
+    else global.CartModule.loadForCurrentUser();
     updateHeaderUI();
   }
 
@@ -141,16 +142,29 @@
   // --------------------------------------------------------------------------
   // Inicialização
   // --------------------------------------------------------------------------
-  function boot() {
+  function setupAgeGate() {
+    const gate = document.getElementById('age-gate');
+    const confirmButton = document.getElementById('age-confirm-btn');
+    const leaveButton = document.getElementById('age-leave-btn');
+    if (!gate) return;
+    if (localStorage.getItem('vitrine_age_confirmed') === 'yes') gate.classList.add('is-hidden');
+    if (confirmButton) confirmButton.addEventListener('click', () => {
+      localStorage.setItem('vitrine_age_confirmed', 'yes');
+      gate.classList.add('is-hidden');
+    });
+    if (leaveButton) leaveButton.addEventListener('click', () => {
+      if (history.length > 1) history.back();
+      else location.replace('about:blank');
+    });
+  }
+
+  async function boot() {
     Utils.setupModalDismiss();
+    setupAgeGate();
 
     // Restaura sessão ("permanecer autenticado") antes de iniciar os módulos,
     // para que carrinho/área do cliente já carreguem os dados corretos.
-    state.currentUser = DataService.Auth.getSession();
-
-    // Aplica o tema e o conteúdo personalizado desde já, independente de qual
-    // tela é exibida primeiro (login, loja ou painel admin).
-    if (global.SiteContentModule) global.SiteContentModule.render();
+    state.currentUser = await DataService.Auth.restoreSession();
 
     global.AuthModule.init();
     global.ProductsModule.init();
@@ -160,8 +174,18 @@
     global.CustomerAreaModule.init();
     global.AdminPanelModule.init();
 
+    if (state.currentUser) global.CartModule.migrateGuestCart(state.currentUser.id);
+
     wireHeaderNav();
     updateHeaderUI();
+    global.addEventListener('vitrine:session-expired', () => {
+      if (!state.currentUser) return;
+      state.currentUser = null;
+      global.CartModule.loadForCurrentUser();
+      updateHeaderUI();
+      Utils.showToast('Sua sessão expirou. Entre novamente para continuar.', 'warning');
+      navigate('login');
+    });
 
     // 'store' é o destino padrão para todos: visitante e cliente ficam na
     // loja; o administrador é automaticamente redirecionado pela guarda de

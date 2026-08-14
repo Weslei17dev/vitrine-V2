@@ -19,12 +19,47 @@
 
   function persist() {
     const userId = currentUserId();
-    if (userId) DataService.Cart.save(userId, items);
+    DataService.Cart.save(userId, items);
+  }
+
+  function sanitizeStoredItems(value) {
+    if (!Array.isArray(value)) return [];
+    return value.slice(0, 50).map((item) => {
+      const productId = String((item && item.productId) || '');
+      const price = Number(item && item.price);
+      const qty = Math.max(1, Math.min(99, Number.parseInt(item && item.qty, 10) || 1));
+      if (!/^[0-9a-f-]{36}$/i.test(productId) || !Number.isFinite(price) || price <= 0) return null;
+      return {
+        productId,
+        name: String(item.name || '').slice(0, 160),
+        price,
+        icon: String(item.icon || '🛍️').slice(0, 8),
+        qty
+      };
+    }).filter(Boolean);
   }
 
   function loadForCurrentUser() {
     const userId = currentUserId();
-    items = userId ? DataService.Cart.get(userId) : [];
+    items = sanitizeStoredItems(DataService.Cart.get(userId));
+    persist();
+    renderAll();
+  }
+
+  function migrateGuestCart(userId) {
+    if (!userId) return;
+    const guestItems = sanitizeStoredItems(DataService.Cart.get(null));
+    const userItems = sanitizeStoredItems(DataService.Cart.get(userId));
+    const merged = new Map();
+    [...(Array.isArray(userItems) ? userItems : []), ...(Array.isArray(guestItems) ? guestItems : [])].forEach((item) => {
+      if (!item || !item.productId) return;
+      const current = merged.get(item.productId);
+      if (current) current.qty = Math.min(99, current.qty + (Number(item.qty) || 1));
+      else merged.set(item.productId, Object.assign({}, item, { qty: Math.max(1, Math.min(99, Number(item.qty) || 1)) }));
+    });
+    items = Array.from(merged.values());
+    DataService.Cart.save(userId, items);
+    DataService.Cart.clear(null);
     renderAll();
   }
 
@@ -90,8 +125,8 @@
 
   function cartItemRowHtml(item) {
     return `
-      <div class="cart-item" data-id="${item.productId}">
-        <div class="cart-item__icon">${item.icon || '🛍️'}</div>
+      <div class="cart-item" data-id="${Utils.escapeHtml(item.productId)}">
+        <div class="cart-item__icon">${Utils.escapeHtml(item.icon || '🛍️')}</div>
         <div class="cart-item__info">
           <strong>${Utils.escapeHtml(item.name)}</strong>
           <span>${Utils.formatCurrency(item.price)} / un.</span>
@@ -179,6 +214,12 @@
           Utils.showToast('Seu carrinho está vazio.', 'warning');
           return;
         }
+        if (!global.App.state.currentUser) {
+          Utils.closeModal('modal-cart');
+          Utils.showToast('Seu carrinho foi salvo. Entre ou crie uma conta para finalizar.', 'info');
+          global.App.navigate('login');
+          return;
+        }
         Utils.closeModal('modal-cart');
         global.OrdersModule.openCheckout(items, getTotal());
       });
@@ -200,6 +241,7 @@
     getTotal,
     getItemCount,
     loadForCurrentUser,
+    migrateGuestCart,
     renderAll
   };
 })(window);

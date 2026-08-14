@@ -13,85 +13,11 @@
 require('dotenv').config();
 const bcrypt = require('bcryptjs');
 const { Pool } = require('pg');
+const { SITE_CONTENT_DEFAULTS, deepMerge } = require('../src/site-defaults');
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'administrador@gmail.com';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '123';
+const ADMIN_EMAIL = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '');
 const ADMIN_NAME = process.env.ADMIN_NAME || 'Administrador';
-
-const SITE_CONTENT_DEFAULTS = {
-  theme: {
-    bg: '#150A10',
-    surface: '#211019',
-    primary: '#FF3D82',
-    primaryDark: '#C81760',
-    accent: '#FF3B4E',
-    accentDark: '#C4172A',
-    text: '#F5EBEF',
-    textMuted: '#B49AA8',
-    dark: '#0B0509'
-  },
-  pix: {
-    chave: 'SUA_CHAVE_PIX_AQUI',
-    nomeBeneficiario: 'BRINCAR DE DESEJO',
-    cidadeBeneficiario: 'SAO PAULO'
-  },
-  hero: {
-    eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
-    title: 'Desejo, prazer e sedução\nem um só lugar.',
-    subtitle:
-      'Produtos selecionados com cuidado, entrega discreta e atendimento sem julgamentos. ' +
-      'Veja o catálogo à vontade — o login só é pedido na hora de fechar o pedido.',
-    ctaText: 'Ver produtos'
-  },
-  carousel: [
-    { image: 'img/promo-dessensibilizante.jpg', alt: 'Dessensibilizante — conforto é prioridade para iniciantes ou amadores' },
-    { image: 'img/promo-bdsm.jpg', alt: 'BDSM — fetiches escondidos' },
-    { image: 'img/promo-acessorios.jpg', alt: 'Acessórios — fetiches escondidos, quanto mais enfeite melhor' },
-    { image: 'img/promo-desconto.jpg', alt: '10% de desconto na primeira compra, cupom 10DE10' }
-  ],
-  flashSale: {
-    tag: 'Oferta Relâmpago',
-    title: 'Aproveite antes que acabe!',
-    description: 'Selecionamos os itens mais desejados com condições especiais por tempo limitado.'
-  },
-  about: {
-    image: 'img/quem-somos.jpg',
-    eyebrow: 'Quem somos',
-    title: 'Prazer, autoconhecimento e liberdade — sem tabus.',
-    paragraph1:
-      'A Brincar de Desejo nasceu para tornar o universo da sexualidade mais leve, acessível e livre ' +
-      'de julgamentos. Selecionamos cada produto com cuidado, pensando em conforto, qualidade e ' +
-      'segurança para todos os corpos e desejos.',
-    paragraph2:
-      'Da escolha à entrega, prezamos pela sua privacidade: embalagens sem identificação, atendimento ' +
-      'humano e discrição do primeiro clique até a porta de casa.',
-    bullets: ['Produtos testados e aprovados', 'Atendimento humano e sem julgamentos', 'Compromisso com a sua privacidade']
-  },
-  spotlight: {
-    image: 'img/promo-dessensibilizante.jpg',
-    eyebrow: 'Mais vendido da semana',
-    title: 'Dessensibilizante — conforto é prioridade',
-    text:
-      'Pensado para iniciantes ou amadores, prolonga o prazer com uma fórmula suave que não tira a ' +
-      'sensibilidade. Aplicação simples e absorção rápida, para uma experiência mais confortável a dois.',
-    buttonText: 'Ver produtos relacionados'
-  },
-  faq: [
-    { q: 'Minha compra é realmente discreta?', a: 'Sim. Todo pedido é enviado em embalagem neutra, sem qualquer identificação da loja ou do conteúdo, tanto na caixa quanto na nota fiscal e no nome do remetente.' },
-    { q: 'Preciso criar conta para ver os produtos?', a: 'Não. Você pode navegar por todo o catálogo, buscar e filtrar produtos livremente sem login. A conta só é pedida na hora de finalizar o pedido.' },
-    { q: 'Quais formas de pagamento vocês aceitam?', a: 'Trabalhamos com PIX via QR Code, com aprovação em poucos minutos após o pagamento.' },
-    { q: 'Em quanto tempo meu pedido chega?', a: 'Após a aprovação do pagamento, o pedido é preparado e enviado rapidamente. Você acompanha cada etapa em tempo real na sua área do cliente.' },
-    { q: 'Posso trocar ou devolver um produto?', a: 'Sim, seguindo nossa política de trocas e devoluções. Entre em contato com a Central de Atendimento informando o número do seu pedido.' },
-    { q: 'Meus dados estão seguros?', a: 'Sim. Seus dados são usados apenas para processar o pedido e nunca são compartilhados. Todo o site utiliza conexão segura.' }
-  ],
-  footer: {
-    about: 'Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.',
-    phone: '(11) 4810-6810',
-    email: 'sac@brincardedesejo.com.br',
-    hours1: 'Seg. a Sex. das 8h às 18h',
-    hours2: 'Sábados das 8h às 12h'
-  }
-};
 
 const PRODUCTS = [
   { name: 'Conjunto Renda Sedução', description: 'Lingerie em renda delicada com detalhes em fita de cetim.', price: 129.9, category: 'Lingerie', icon: '🎀', color: '#C2185B', stock: 34 },
@@ -110,10 +36,20 @@ async function main() {
     console.error('\n❌ Variável DATABASE_URL não encontrada. Configure o arquivo .env primeiro.\n');
     process.exit(1);
   }
+  if (!ADMIN_EMAIL || !ADMIN_PASSWORD) {
+    console.error('\n❌ Configure ADMIN_EMAIL e ADMIN_PASSWORD antes de executar o seed.\n');
+    process.exit(1);
+  }
+  if (ADMIN_PASSWORD.length < 10 || !/[A-Za-zÀ-ÿ]/.test(ADMIN_PASSWORD) || !/\d/.test(ADMIN_PASSWORD)) {
+    console.error('\n❌ ADMIN_PASSWORD deve ter pelo menos 10 caracteres, contendo letras e números.\n');
+    process.exit(1);
+  }
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL.includes('localhost')
+      ? false
+      : { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' }
   });
 
   const client = await pool.connect();
@@ -122,29 +58,35 @@ async function main() {
     // ------------------------------------------------------------------
     // Administrador
     // ------------------------------------------------------------------
-    const existingAdmin = await client.query('SELECT id FROM users WHERE email = $1', [ADMIN_EMAIL]);
+    const existingAdmin = await client.query('SELECT id FROM users WHERE lower(email) = $1', [ADMIN_EMAIL]);
     if (existingAdmin.rows.length === 0) {
-      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
+      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
       await client.query(
         `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, 'admin')`,
         [ADMIN_NAME, ADMIN_EMAIL, passwordHash]
       );
-      console.log(`✅ Conta de administrador criada: ${ADMIN_EMAIL} / ${ADMIN_PASSWORD}`);
-      console.log('   ⚠️  Troque essa senha assim que possível (crie um novo admin e remova este, ou ' +
-        'rode o seed de novo com ADMIN_PASSWORD diferente antes do primeiro deploy público).');
+      console.log(`✅ Conta de administrador criada: ${ADMIN_EMAIL}`);
     } else {
-      console.log('↷ Conta de administrador já existe, mantida como está.');
+      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+      await client.query(
+        `UPDATE users SET name=$1, password_hash=$2, role='admin', token_version=token_version+1, updated_at=now()
+         WHERE lower(email)=$3`,
+        [ADMIN_NAME, passwordHash, ADMIN_EMAIL]
+      );
+      console.log('✅ Conta de administrador atualizada e sessões antigas revogadas.');
     }
 
     // ------------------------------------------------------------------
     // Conteúdo do site
     // ------------------------------------------------------------------
-    const existingContent = await client.query('SELECT id FROM site_content WHERE id = 1');
+    const existingContent = await client.query('SELECT id, content FROM site_content WHERE id = 1');
     if (existingContent.rows.length === 0) {
       await client.query('INSERT INTO site_content (id, content) VALUES (1, $1)', [SITE_CONTENT_DEFAULTS]);
       console.log('✅ Conteúdo padrão do site criado (banners, textos, tema, FAQ, PIX).');
     } else {
-      console.log('↷ Conteúdo do site já existe, mantido como está.');
+      const repairedContent = deepMerge(SITE_CONTENT_DEFAULTS, existingContent.rows[0].content || {});
+      await client.query('UPDATE site_content SET content=$1, updated_at=now() WHERE id=1', [repairedContent]);
+      console.log('✅ Conteúdo do site verificado e campos ausentes restaurados.');
     }
 
     // ------------------------------------------------------------------
@@ -166,16 +108,16 @@ async function main() {
       // Algumas avaliações de exemplo nos dois primeiros produtos.
       if (insertedIds[0]) {
         await client.query(
-          `INSERT INTO reviews (product_id, author_name, rating, comment) VALUES
-           ($1, 'Cliente verificado', 5, 'Produto excelente, chegou super rápido e a embalagem era bem discreta como prometido.'),
-           ($1, 'Cliente verificado', 4, 'Muito bom, só achei o frasco um pouco pequeno para o preço.')`,
+          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase) VALUES
+           ($1, 'Cliente demonstrativo', 5, 'Produto excelente e embalagem discreta.', false),
+           ($1, 'Cliente demonstrativo', 4, 'Gostei do produto e do atendimento.', false)`,
           [insertedIds[0]]
         );
       }
       if (insertedIds[1]) {
         await client.query(
-          `INSERT INTO reviews (product_id, author_name, rating, comment) VALUES
-           ($1, 'Cliente verificado', 5, 'Superou minhas expectativas, recomendo muito!')`,
+          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase) VALUES
+           ($1, 'Cliente demonstrativo', 5, 'Superou minhas expectativas.', false)`,
           [insertedIds[1]]
         );
       }

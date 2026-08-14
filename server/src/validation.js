@@ -1,0 +1,146 @@
+'use strict';
+
+class ValidationError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'ValidationError';
+    this.status = 400;
+  }
+}
+
+function text(value, label, options = {}) {
+  const { required = true, min = required ? 1 : 0, max = 255 } = options;
+  const normalized = String(value == null ? '' : value).trim();
+  if (required && !normalized) throw new ValidationError(`${label} é obrigatório.`);
+  if (normalized && normalized.length < min) throw new ValidationError(`${label} é muito curto.`);
+  if (normalized.length > max) throw new ValidationError(`${label} ultrapassa ${max} caracteres.`);
+  return normalized;
+}
+
+function normalizeEmail(value) {
+  const normalized = text(value, 'E-mail', { max: 254 }).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    throw new ValidationError('Informe um e-mail válido.');
+  }
+  return normalized;
+}
+
+function password(value, label = 'Senha') {
+  const normalized = String(value || '');
+  if (normalized.length < 10 || normalized.length > 128) {
+    throw new ValidationError(`${label} deve ter entre 10 e 128 caracteres.`);
+  }
+  if (!/[A-Za-zÀ-ÿ]/.test(normalized) || !/\d/.test(normalized)) {
+    throw new ValidationError(`${label} deve conter letras e números.`);
+  }
+  return normalized;
+}
+
+function digits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function phone(value) {
+  const normalized = digits(value);
+  if (normalized.length < 10 || normalized.length > 13) {
+    throw new ValidationError('Informe um telefone válido com DDD.');
+  }
+  return normalized;
+}
+
+function zip(value) {
+  const normalized = digits(value);
+  if (normalized.length !== 8) throw new ValidationError('Informe um CEP válido.');
+  return normalized;
+}
+
+function state(value) {
+  const normalized = text(value, 'Estado', { min: 2, max: 2 }).toUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalized)) throw new ValidationError('Informe a UF com duas letras.');
+  return normalized;
+}
+
+function isValidCpf(value) {
+  const cpf = digits(value);
+  if (!cpf) return true;
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const calc = (length) => {
+    let sum = 0;
+    for (let i = 0; i < length; i += 1) sum += Number(cpf[i]) * (length + 1 - i);
+    const remainder = (sum * 10) % 11;
+    return remainder === 10 ? 0 : remainder;
+  };
+  return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
+}
+
+function cpf(value) {
+  const normalized = digits(value);
+  if (normalized && !isValidCpf(normalized)) throw new ValidationError('Informe um CPF válido.');
+  return normalized || null;
+}
+
+function uuid(value, label = 'Identificador') {
+  const normalized = String(value || '').toLowerCase();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
+    throw new ValidationError(`${label} inválido.`);
+  }
+  return normalized;
+}
+
+function positiveInteger(value, label, max = 999999) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 1 || number > max) {
+    throw new ValidationError(`${label} inválida.`);
+  }
+  return number;
+}
+
+function nonNegativeInteger(value, label, max = 999999) {
+  const number = Number(value);
+  if (!Number.isInteger(number) || number < 0 || number > max) {
+    throw new ValidationError(`${label} inválido.`);
+  }
+  return number;
+}
+
+function positiveMoney(value, label = 'Preço') {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number <= 0 || number > 99999999.99) {
+    throw new ValidationError(`${label} inválido.`);
+  }
+  return Math.round(number * 100) / 100;
+}
+
+function color(value) {
+  const normalized = String(value || '').trim();
+  if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) throw new ValidationError('Cor inválida.');
+  return normalized.toUpperCase();
+}
+
+function imageSource(value, label = 'Imagem') {
+  if (!value) return null;
+  const source = String(value).trim();
+  if (source.length > 400000) throw new ValidationError(`${label} ultrapassa o limite aproximado de 300 KB.`);
+  const isHttps = /^https:\/\/[^\s]+$/i.test(source);
+  const isLocal = /^img\/[A-Za-z0-9._/-]+$/.test(source) && !source.includes('..');
+  const isDataImage = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(source);
+  if (!isHttps && !isLocal && !isDataImage) throw new ValidationError(`${label} possui formato ou endereço inválido.`);
+  return source;
+}
+
+module.exports = {
+  ValidationError,
+  text,
+  normalizeEmail,
+  password,
+  phone,
+  zip,
+  state,
+  cpf,
+  uuid,
+  positiveInteger,
+  nonNegativeInteger,
+  positiveMoney,
+  color,
+  imageSource
+};

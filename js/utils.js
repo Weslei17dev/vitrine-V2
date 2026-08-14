@@ -25,6 +25,53 @@
     return div.innerHTML;
   }
 
+  function safeImageSrc(value) {
+    if (!value) return '';
+    const source = String(value).trim();
+    const isHttps = /^https:\/\/[^\s]+$/i.test(source);
+    const isLocal = /^img\/[A-Za-z0-9._/-]+$/.test(source) && !source.includes('..');
+    const isDataImage = /^data:image\/(?:png|jpeg|webp|gif);base64,/i.test(source);
+    return isHttps || isLocal || isDataImage ? source : '';
+  }
+
+  function safeColor(value) {
+    const color = String(value || '');
+    return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#FF3D82';
+  }
+
+  function compressImageFile(file, options = {}) {
+    const maxWidth = options.maxWidth || 1200;
+    const maxHeight = options.maxHeight || 1200;
+    const quality = options.quality || 0.78;
+    if (!file || !/^image\/(png|jpeg|webp|gif)$/i.test(file.type)) {
+      return Promise.reject(new Error('Selecione uma imagem PNG, JPG, WEBP ou GIF.'));
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      return Promise.reject(new Error('A imagem original deve ter no máximo 8 MB.'));
+    }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error('Arquivo de imagem inválido.'));
+        image.onload = () => {
+          const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(image.width * scale));
+          canvas.height = Math.max(1, Math.round(image.height * scale));
+          const context = canvas.getContext('2d');
+          context.drawImage(image, 0, 0, canvas.width, canvas.height);
+          const result = canvas.toDataURL('image/webp', quality);
+          if (result.length > 400000) return reject(new Error('A imagem continua muito grande após a otimização. Use uma imagem menor.'));
+          resolve(result);
+        };
+        image.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
   function maskPhone(value) {
     return value
       .replace(/\D/g, '')
@@ -83,6 +130,7 @@
       container = document.createElement('div');
       container.id = 'toast-container';
       container.className = 'toast-container';
+      container.setAttribute('aria-live', 'polite');
       document.body.appendChild(container);
     }
     return container;
@@ -124,20 +172,32 @@
   // --------------------------------------------------------------------------
   // Modais genéricos (abrir/fechar por id, fecha ao clicar fora ou ESC)
   // --------------------------------------------------------------------------
+  let lastFocusedElement = null;
+
+  function focusableElements(modal) {
+    return Array.from(modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'));
+  }
+
   function openModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
+    lastFocusedElement = document.activeElement;
     modal.classList.add('modal--open');
+    modal.setAttribute('aria-hidden', 'false');
     document.body.classList.add('no-scroll');
+    const focusable = focusableElements(modal);
+    if (focusable[0]) focusable[0].focus();
   }
 
   function closeModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
     modal.classList.remove('modal--open');
+    modal.setAttribute('aria-hidden', 'true');
     if (!document.querySelector('.modal--open')) {
       document.body.classList.remove('no-scroll');
     }
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') lastFocusedElement.focus();
   }
 
   function setupModalDismiss() {
@@ -153,6 +213,21 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         document.querySelectorAll('.modal--open').forEach((m) => closeModal(m.id));
+      }
+      if (e.key === 'Tab') {
+        const modal = document.querySelector('.modal--open');
+        if (!modal) return;
+        const focusable = focusableElements(modal);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
   }
@@ -197,6 +272,9 @@
   global.Utils = {
     formatCurrency,
     escapeHtml,
+    safeImageSrc,
+    safeColor,
+    compressImageFile,
     maskPhone,
     maskCpf,
     maskCep,

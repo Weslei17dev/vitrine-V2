@@ -13,6 +13,7 @@
   'use strict';
 
   let carouselHandle = null;
+  let renderPromise = null;
 
   function setText(id, value) {
     const el = document.getElementById(id);
@@ -29,7 +30,8 @@
   function setImage(id, src, alt) {
     const el = document.getElementById(id);
     if (!el) return;
-    if (src) el.src = src;
+    const safeSource = Utils.safeImageSrc(src);
+    if (safeSource) el.src = safeSource;
     if (alt) el.alt = alt;
   }
 
@@ -78,7 +80,7 @@
       carouselHandle = null;
     }
 
-    const list = Array.isArray(slides) && slides.length ? slides : [];
+    const list = Array.isArray(slides) ? slides.filter((slide) => slide && Utils.safeImageSrc(slide.image)) : [];
     if (!list.length) {
       root.innerHTML = '';
       return;
@@ -89,7 +91,7 @@
         .map(
           (slide, i) => `
         <div class="promo-carousel__slide${i === 0 ? ' is-active' : ''}">
-          <img src="${Utils.escapeHtml(slide.image)}" alt="${Utils.escapeHtml(slide.alt || '')}">
+          <img src="${Utils.escapeHtml(Utils.safeImageSrc(slide.image))}" alt="${Utils.escapeHtml(slide.alt || '')}" loading="lazy">
         </div>`
         )
         .join('') +
@@ -177,7 +179,7 @@
       .map(
         (item) => `
       <div class="faq__item">
-        <button class="faq__question" type="button">
+        <button class="faq__question" type="button" aria-expanded="false">
           <span>${Utils.escapeHtml(item.q)}</span>
           <i class="fa-solid fa-chevron-down"></i>
         </button>
@@ -194,6 +196,8 @@
         const isOpen = item.classList.contains('is-open');
         root.querySelectorAll('.faq__item').forEach((other) => other.classList.remove('is-open'));
         if (!isOpen) item.classList.add('is-open');
+        root.querySelectorAll('.faq__question').forEach((button) => button.setAttribute('aria-expanded', 'false'));
+        question.setAttribute('aria-expanded', String(!isOpen));
       });
     });
   }
@@ -223,8 +227,15 @@
     applyFooter(content.footer);
   }
 
-  function render() {
-    return DataService.SiteContent.get().then(applyContent);
+  function render(force) {
+    if (renderPromise && !force) return renderPromise;
+    renderPromise = DataService.SiteContent.get(Boolean(force))
+      .then(applyContent)
+      .catch((err) => {
+        renderPromise = null;
+        console.warn('[site-content] Conteúdo remoto indisponível:', err.message);
+      });
+    return renderPromise;
   }
 
   global.SiteContentModule = { render };

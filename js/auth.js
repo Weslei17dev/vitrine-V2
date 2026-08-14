@@ -92,8 +92,8 @@
     }
 
     const password = form.elements.password;
-    if (password.value && password.value.length < 3) {
-      showFieldError(password, 'A senha deve ter ao menos 3 caracteres.');
+    if (password.value && (password.value.length < 10 || !/[A-Za-zÀ-ÿ]/.test(password.value) || !/\d/.test(password.value))) {
+      showFieldError(password, 'Use pelo menos 10 caracteres, com letras e números.');
       valid = false;
     }
 

@@ -20,7 +20,9 @@ async function main() {
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('localhost') ? false : { rejectUnauthorized: false }
+    ssl: process.env.DATABASE_URL.includes('localhost')
+      ? false
+      : { rejectUnauthorized: process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false' }
   });
 
   const schemaPath = path.join(__dirname, 'schema.sql');
@@ -31,8 +33,13 @@ async function main() {
 
   try {
     console.log('▶ Rodando schema.sql (criando tabelas)...');
+    await client.query('BEGIN');
     await client.query(schemaSql);
+    await client.query('COMMIT');
     console.log('✅ Banco de dados pronto! Todas as tabelas foram criadas.');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
   } finally {
     client.release();
     await pool.end();

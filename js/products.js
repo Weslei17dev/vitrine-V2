@@ -13,6 +13,7 @@
     category: 'Todos',
     search: ''
   };
+  let loadPromise = null;
 
   function getFiltered() {
     return state.all.filter((p) => {
@@ -46,12 +47,14 @@
   }
 
   function productCardHtml(product) {
-    const imageHtml = product.image
-      ? `<img class="product-card__photo" src="${product.image}" alt="${Utils.escapeHtml(product.name)}">`
-      : `<span style="font-size:2.6rem">${product.icon || '🛍️'}</span>`;
+    const safeImage = Utils.safeImageSrc(product.image);
+    const imageHtml = safeImage
+      ? `<img class="product-card__photo" src="${Utils.escapeHtml(safeImage)}" alt="${Utils.escapeHtml(product.name)}" loading="lazy">`
+      : `<span style="font-size:2.6rem">${Utils.escapeHtml(product.icon || '🛍️')}</span>`;
+    const unavailable = Number(product.stock) <= 0;
     return `
       <article class="product-card" data-id="${product.id}">
-        <div class="product-card__image" style="background:${product.color}22;">
+        <div class="product-card__image" style="background:${Utils.safeColor(product.color)}22;">
           ${imageHtml}
           <span class="product-card__category">${Utils.escapeHtml(product.category)}</span>
         </div>
@@ -61,8 +64,8 @@
         </div>
         <div class="product-card__footer">
           <span class="product-card__price">${Utils.formatCurrency(product.price)}</span>
-          <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${product.id}">
-            <i class="fa-solid fa-cart-plus"></i> Adicionar
+          <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${Utils.escapeHtml(product.id)}" ${unavailable ? 'disabled' : ''}>
+            <i class="fa-solid ${unavailable ? 'fa-ban' : 'fa-cart-plus'}"></i> ${unavailable ? 'Indisponível' : 'Adicionar'}
           </button>
         </div>
       </article>`;
@@ -72,13 +75,14 @@
   // Faixa "Produtos em Destaque" (reaproveita os mesmos dados do catálogo)
   // --------------------------------------------------------------------------
   function featuredCardHtml(product) {
-    const imageHtml = product.image
-      ? `<img class="product-card__photo" src="${product.image}" alt="${Utils.escapeHtml(product.name)}">`
-      : `<span style="font-size:2.4rem">${product.icon || '🛍️'}</span>`;
+    const safeImage = Utils.safeImageSrc(product.image);
+    const imageHtml = safeImage
+      ? `<img class="product-card__photo" src="${Utils.escapeHtml(safeImage)}" alt="${Utils.escapeHtml(product.name)}" loading="lazy">`
+      : `<span style="font-size:2.4rem">${Utils.escapeHtml(product.icon || '🛍️')}</span>`;
     return `
       <article class="featured-card" data-id="${product.id}">
         <span class="featured-card__badge"><i class="fa-solid fa-fire"></i> Mais Vendido</span>
-        <div class="featured-card__image" style="background:${product.color}22;">
+        <div class="featured-card__image" style="background:${Utils.safeColor(product.color)}22;">
           ${imageHtml}
         </div>
         <div class="featured-card__body">
@@ -86,7 +90,7 @@
           <h3>${Utils.escapeHtml(product.name)}</h3>
           <div class="featured-card__footer">
             <span class="featured-card__price">${Utils.formatCurrency(product.price)}</span>
-            <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${product.id}">
+            <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${Utils.escapeHtml(product.id)}" ${Number(product.stock) <= 0 ? 'disabled' : ''}>
               <i class="fa-solid fa-cart-plus"></i>
             </button>
           </div>
@@ -137,17 +141,12 @@
   }
 
   function handleAddToCart(productId) {
-    const currentUser = global.App.state.currentUser;
-    if (!currentUser || currentUser.role !== 'client') {
-      Utils.showToast('Faça login como cliente para adicionar produtos ao carrinho.', 'warning', {
-        title: 'Login necessário'
-      });
-      global.App.navigate('login');
-      return;
-    }
-
     const product = state.all.find((p) => p.id === productId);
     if (!product) return;
+    if (Number(product.stock) <= 0) {
+      Utils.showToast('Este produto está sem estoque no momento.', 'warning');
+      return;
+    }
 
     global.CartModule.addItem(product);
     Utils.showToast(`${product.name} adicionado ao carrinho.`, 'success');
@@ -176,21 +175,26 @@
     });
   }
 
-  function loadAndRender() {
-    return DataService.Products.getAll().then((products) => {
+  function loadAndRender(force) {
+    if (loadPromise && !force) return loadPromise;
+    loadPromise = DataService.Products.getAll(Boolean(force)).then((products) => {
       state.all = products;
       renderCategoryFilters();
       renderGrid();
       renderFeatured();
       return products;
+    }).catch((err) => {
+      loadPromise = null;
+      Utils.showToast(err.message || 'Não foi possível carregar os produtos.', 'error');
+      throw err;
     });
+    return loadPromise;
   }
 
   function init() {
     wireSearch();
     wireGridClicks();
     wireFeaturedClicks();
-    loadAndRender();
   }
 
   function getById(productId) {

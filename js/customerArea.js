@@ -40,7 +40,7 @@
     if (!totalOrders) return;
 
     const spent = orders
-      .filter((o) => o.status !== 'Cancelado')
+      .filter((o) => ['Pago', 'Em Produção', 'Enviado', 'Finalizado'].includes(o.status))
       .reduce((sum, o) => sum + o.total, 0);
     const pendingCount = orders.filter((o) =>
       ['Aguardando Pagamento', 'Aguardando Confirmação'].includes(o.status)
@@ -83,12 +83,16 @@
       if (silent && snapshot === lastSnapshot) return;
       lastSnapshot = snapshot;
       render(orders);
+    }).catch((err) => {
+      if (!silent) Utils.showToast(err.message, 'error');
     });
   }
 
   function startPolling() {
     stopPolling();
-    pollingHandle = setInterval(() => fetchAndRender(true), 3000);
+    pollingHandle = setInterval(() => {
+      if (!document.hidden) fetchAndRender(true);
+    }, 15000);
   }
 
   function stopPolling() {
@@ -104,9 +108,61 @@
         if (btn) global.OrdersModule.showOrderDetail(btn.dataset.id);
       });
     }
+
+    const profileForm = document.getElementById('form-account-profile');
+    if (profileForm) {
+      profileForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const payload = Object.fromEntries(new FormData(form).entries());
+        DataService.Auth.updateProfile(payload).then((user) => {
+          global.App.setCurrentUser(user);
+          Utils.showToast('Dados da conta atualizados.', 'success');
+        }).catch((err) => Utils.showToast(err.message, 'error'));
+      });
+      profileForm.elements.phone.addEventListener('input', (e) => { e.target.value = Utils.maskPhone(e.target.value); });
+      profileForm.elements.cpf.addEventListener('input', (e) => { e.target.value = Utils.maskCpf(e.target.value); });
+      profileForm.elements.zip.addEventListener('input', (e) => { e.target.value = Utils.maskCep(e.target.value); });
+    }
+
+    const passwordForm = document.getElementById('form-account-password');
+    if (passwordForm) passwordForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const form = e.target;
+      DataService.Auth.changePassword(form.elements.currentPassword.value, form.elements.newPassword.value)
+        .then((user) => {
+          global.App.setCurrentUser(user);
+          form.reset();
+          Utils.showToast('Senha alterada e sessões antigas encerradas.', 'success');
+        })
+        .catch((err) => Utils.showToast(err.message, 'error'));
+    });
+
+    const deleteForm = document.getElementById('form-delete-account');
+    if (deleteForm) deleteForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!confirm('Excluir definitivamente sua conta? Esta ação não pode ser desfeita.')) return;
+      const userId = global.App.state.currentUser && global.App.state.currentUser.id;
+      DataService.Auth.deleteAccount(e.target.elements.password.value).then(() => {
+        if (userId) DataService.Cart.clear(userId);
+        global.App.setCurrentUser(null);
+        Utils.showToast('Conta excluída.', 'info');
+        global.App.navigate('store');
+      }).catch((err) => Utils.showToast(err.message, 'error'));
+    });
+  }
+
+  function populateAccountForm() {
+    const user = global.App.state.currentUser;
+    const form = document.getElementById('form-account-profile');
+    if (!user || !form) return;
+    ['name', 'cpf', 'phone', 'address', 'city', 'state', 'zip'].forEach((field) => {
+      if (form.elements[field]) form.elements[field].value = user[field] || '';
+    });
   }
 
   function refresh() {
+    populateAccountForm();
     fetchAndRender(false);
   }
 

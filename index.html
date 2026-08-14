@@ -3,19 +3,35 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Loja online de produtos para adultos com atendimento humano, pagamento via PIX e envio discreto.">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'">
 <title>Brincar de Desejo — Loja &amp; Painel Administrativo</title>
 
 <!-- Ícones -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g" crossorigin="anonymous" referrerpolicy="no-referrer">
 <!-- Tipografia -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
 <!-- Gerador de QR Code (usado para exibir o "QR Code PIX" simulado) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
+<div id="age-gate" class="age-gate" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
+  <div class="age-gate__card">
+    <span class="brand brand--light">
+      <span class="brand__mark"><img src="img/brand-icon.jpg" alt=""></span>
+      <span class="brand__name">Brincar de Desejo</span>
+    </span>
+    <h1 id="age-gate-title">Conteúdo destinado a maiores de 18 anos</h1>
+    <p>Ao continuar, você confirma que possui 18 anos ou mais.</p>
+    <button type="button" id="age-confirm-btn" class="btn btn--primary btn--block">Tenho 18 anos ou mais</button>
+    <button type="button" id="age-leave-btn" class="btn btn--outline btn--block">Sair</button>
+  </div>
+</div>
 
 <!-- ============================================================
      CABEÇALHO DA LOJA (visível para visitante e cliente logado;
@@ -96,11 +112,6 @@
           <i class="fa-solid fa-right-to-bracket"></i> Entrar
         </button>
 
-        <p class="auth-form__hint">
-          <i class="fa-solid fa-circle-info"></i>
-          Teste como administrador: <strong>administrador@gmail.com</strong> / senha <strong>123</strong>
-        </p>
-
         <p class="auth-form__switch">
           Ainda não tem conta? <a href="#" data-action="go-register">Cadastre-se</a>
         </p>
@@ -156,7 +167,7 @@
 
           <div class="form-field form-field--span2">
             <label for="reg-password">Senha</label>
-            <input id="reg-password" name="password" type="password" placeholder="Crie uma senha" autocomplete="new-password" required>
+            <input id="reg-password" name="password" type="password" placeholder="Mínimo de 10 caracteres, com letras e números" autocomplete="new-password" minlength="10" maxlength="128" required>
           </div>
 
           <div class="form-field form-field--span2">
@@ -214,9 +225,9 @@
   <div class="store-perks-bar">
     <div class="store-perks-bar__inner">
       <div class="store-perk"><i class="fa-solid fa-box"></i> Embalagem sem identificação</div>
-      <div class="store-perk"><i class="fa-solid fa-truck-fast"></i> Frete grátis acima de R$250</div>
-      <div class="store-perk"><i class="fa-solid fa-credit-card"></i> 10x sem juros no cartão</div>
-      <div class="store-perk"><i class="fa-solid fa-qrcode"></i> Pague com PIX na hora</div>
+      <div class="store-perk"><i class="fa-solid fa-headset"></i> Atendimento humano</div>
+      <div class="store-perk"><i class="fa-solid fa-receipt"></i> Acompanhe o pedido online</div>
+      <div class="store-perk"><i class="fa-solid fa-qrcode"></i> Pagamento via PIX</div>
     </div>
   </div>
 
@@ -244,7 +255,7 @@
     <div class="trust-row">
       <div class="trust-item"><i class="fa-solid fa-user-secret"></i><span>Privacidade Total</span></div>
       <div class="trust-item"><i class="fa-solid fa-box-open"></i><span>Embalagem Discreta</span></div>
-      <div class="trust-item"><i class="fa-solid fa-bolt"></i><span>Entrega Rápida</span></div>
+      <div class="trust-item"><i class="fa-solid fa-receipt"></i><span>Status do Pedido</span></div>
       <div class="trust-item"><i class="fa-solid fa-shield-heart"></i><span>Pagamento Seguro</span></div>
     </div>
 
@@ -303,14 +314,9 @@
     <!-- Oferta relâmpago -->
     <div class="flash-sale-banner">
       <div class="flash-sale-banner__info">
-        <span class="flash-sale-banner__tag"><i class="fa-solid fa-bolt"></i> <span id="flash-sale-tag">Oferta Relâmpago</span></span>
-        <h2 id="flash-sale-title">Aproveite antes que acabe!</h2>
-        <p id="flash-sale-description">Selecionamos os itens mais desejados com condições especiais por tempo limitado.</p>
-      </div>
-      <div class="flash-sale-banner__timer" id="flash-sale-countdown" aria-label="Tempo restante da oferta">
-        <div class="flash-sale-banner__timer-box"><span data-timer="hours">00</span><small>h</small></div>
-        <div class="flash-sale-banner__timer-box"><span data-timer="minutes">00</span><small>min</small></div>
-        <div class="flash-sale-banner__timer-box"><span data-timer="seconds">00</span><small>s</small></div>
+        <span class="flash-sale-banner__tag"><i class="fa-solid fa-star"></i> <span id="flash-sale-tag">Seleção Especial</span></span>
+        <h2 id="flash-sale-title">Descubra os favoritos da loja</h2>
+        <p id="flash-sale-description">Produtos selecionados para tornar seus momentos ainda mais especiais.</p>
       </div>
     </div>
 
@@ -321,7 +327,7 @@
       </div>
       <div class="store-hero__search">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input id="product-search" type="text" placeholder="Buscar produto...">
+        <input id="product-search" type="search" placeholder="Buscar produto..." aria-label="Buscar produto">
       </div>
     </div>
 
@@ -343,7 +349,7 @@
       <li class="order-process__step">
         <span class="order-process__icon"><i class="fa-solid fa-circle-check"></i></span>
         <h3>Pedido aprovado</h3>
-        <p>Pague com PIX e a aprovação chega em poucos minutos.</p>
+        <p>Pague com PIX e informe o pagamento para conferência da equipe.</p>
       </li>
       <li class="order-process__step">
         <span class="order-process__icon"><i class="fa-solid fa-truck-fast"></i></span>
@@ -377,6 +383,21 @@
       <p>Tudo o que você precisa saber antes de comprar.</p>
     </div>
     <div class="faq" id="faq"></div>
+
+    <div class="legal-notices">
+      <section id="privacy-notice" class="legal-notice">
+        <h2>Política de Privacidade</h2>
+        <p>Utilizamos os dados informados para criar sua conta, processar pedidos, organizar a entrega e prestar atendimento. Senhas são armazenadas somente em formato protegido. Para solicitar correção ou exclusão da conta, entre em contato pelo e-mail exibido no rodapé.</p>
+      </section>
+      <section id="exchange-notice" class="legal-notice">
+        <h2>Trocas e Devoluções</h2>
+        <p>Entre em contato com o atendimento informando o número do pedido. A equipe analisará o prazo, o estado do produto e as condições aplicáveis antes de orientar o envio.</p>
+      </section>
+      <section id="security-notice" class="legal-notice">
+        <h2>Compra Segura</h2>
+        <p>O pagamento disponível no site é PIX. Antes de pagar, confira no aplicativo do banco o nome do beneficiário e o valor do pedido. A confirmação do pagamento é feita pela equipe.</p>
+      </section>
+    </div>
   </div>
 
   <!-- Rodapé institucional -->
@@ -388,21 +409,16 @@
           <span class="brand__name">Brincar de Desejo</span>
         </span>
         <p id="footer-about">Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.</p>
-        <div class="store-footer__social">
-          <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
-          <a href="#" aria-label="Facebook"><i class="fa-brands fa-facebook-f"></i></a>
-          <a href="#" aria-label="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>
-          <a href="#" aria-label="TikTok"><i class="fa-brands fa-tiktok"></i></a>
-        </div>
+        <div class="store-footer__social"><a href="mailto:sac@brincardedesejo.com.br" aria-label="Enviar e-mail"><i class="fa-solid fa-envelope"></i></a></div>
       </div>
 
       <div class="store-footer__col">
         <h3>Institucional</h3>
         <ul>
-          <li><a href="#">Quem Somos</a></li>
-          <li><a href="#">Política de Privacidade</a></li>
-          <li><a href="#">Trocas e Devoluções</a></li>
-          <li><a href="#">Compra Segura</a></li>
+          <li><a href="#about-title">Quem Somos</a></li>
+          <li><a href="#privacy-notice">Política de Privacidade</a></li>
+          <li><a href="#exchange-notice">Trocas e Devoluções</a></li>
+          <li><a href="#security-notice">Compra Segura</a></li>
         </ul>
       </div>
 
@@ -420,9 +436,6 @@
         <h3>Formas de pagamento</h3>
         <div class="store-footer__payments">
           <span><i class="fa-solid fa-qrcode"></i> PIX</span>
-          <span><i class="fa-brands fa-cc-visa"></i></span>
-          <span><i class="fa-brands fa-cc-mastercard"></i></span>
-          <span><i class="fa-solid fa-credit-card"></i></span>
         </div>
         <h3 class="store-footer__seals-title">Segurança</h3>
         <div class="store-footer__seals">
@@ -489,7 +502,7 @@
           <button type="button" data-value="4" aria-label="4 estrelas"><i class="fa-solid fa-star"></i></button>
           <button type="button" data-value="5" aria-label="5 estrelas"><i class="fa-solid fa-star"></i></button>
         </div>
-        <textarea id="pd-review-comment" rows="3" placeholder="Conte o que você achou do produto..." required></textarea>
+        <textarea id="pd-review-comment" rows="3" placeholder="Conte o que você achou do produto..." aria-label="Comentário da avaliação" maxlength="1000" required></textarea>
         <button type="submit" class="btn btn--outline btn--sm"><i class="fa-solid fa-paper-plane"></i> Enviar avaliação</button>
       </form>
 
@@ -511,8 +524,43 @@
   <div class="page-container">
     <div class="page-header">
       <h1>Meus Pedidos</h1>
-      <p>Acompanhe o status de cada pedido em tempo real.</p>
+      <p>Acompanhe online o status informado pela equipe.</p>
     </div>
+
+    <details class="panel-card account-panel">
+      <summary><i class="fa-solid fa-user-gear"></i> Minha conta e segurança</summary>
+      <div class="account-panel__content">
+        <form id="form-account-profile">
+          <h2>Dados pessoais e entrega</h2>
+          <div class="form-grid">
+            <div class="form-field form-field--span2"><label for="account-name">Nome</label><input id="account-name" name="name" required></div>
+            <div class="form-field"><label for="account-cpf">CPF opcional</label><input id="account-cpf" name="cpf"></div>
+            <div class="form-field"><label for="account-phone">Telefone</label><input id="account-phone" name="phone" required></div>
+            <div class="form-field form-field--span2"><label for="account-address">Endereço</label><input id="account-address" name="address" required></div>
+            <div class="form-field"><label for="account-city">Cidade</label><input id="account-city" name="city" required></div>
+            <div class="form-field"><label for="account-state">UF</label><input id="account-state" name="state" maxlength="2" required></div>
+            <div class="form-field"><label for="account-zip">CEP</label><input id="account-zip" name="zip" required></div>
+          </div>
+          <button type="submit" class="btn btn--primary btn--sm">Salvar dados</button>
+        </form>
+
+        <form id="form-account-password">
+          <h2>Alterar senha</h2>
+          <div class="form-grid">
+            <div class="form-field"><label for="account-current-password">Senha atual</label><input id="account-current-password" name="currentPassword" type="password" autocomplete="current-password" required></div>
+            <div class="form-field"><label for="account-new-password">Nova senha</label><input id="account-new-password" name="newPassword" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+          </div>
+          <button type="submit" class="btn btn--outline btn--sm">Alterar senha e encerrar sessões antigas</button>
+        </form>
+
+        <form id="form-delete-account" class="account-danger-zone">
+          <h2>Excluir minha conta</h2>
+          <p>Esta ação remove seus dados de cadastro. Os pedidos permanecem registrados sem vínculo com a conta.</p>
+          <div class="form-field"><label for="delete-account-password">Confirme sua senha</label><input id="delete-account-password" name="password" type="password" autocomplete="current-password" required></div>
+          <button type="submit" class="btn btn--danger btn--sm">Excluir conta definitivamente</button>
+        </form>
+      </div>
+    </details>
 
     <div class="kpi-row kpi-row--3">
       <div class="kpi-card">
@@ -910,11 +958,11 @@
 <!-- ============================================================
      MODAL: CARRINHO (drawer lateral)
 ============================================================= -->
-<div id="modal-cart" class="modal modal--drawer">
+<div id="modal-cart" class="modal modal--drawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-cart-title">
   <div class="modal__backdrop" data-close-modal></div>
   <div class="modal__drawer">
     <div class="modal__header">
-      <h2><i class="fa-solid fa-cart-shopping"></i> Seu Carrinho</h2>
+      <h2 id="modal-cart-title"><i class="fa-solid fa-cart-shopping"></i> Seu Carrinho</h2>
       <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
@@ -946,11 +994,11 @@
 <!-- ============================================================
      MODAL: FINALIZAÇÃO DO PEDIDO (revisão + pagamento PIX)
 ============================================================= -->
-<div id="modal-checkout" class="modal">
+<div id="modal-checkout" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-checkout-title">
   <div class="modal__backdrop" data-close-modal></div>
   <div class="modal__dialog modal__dialog--wide">
     <div class="modal__header">
-      <h2><i class="fa-solid fa-bag-shopping"></i> Finalizar Pedido</h2>
+      <h2 id="modal-checkout-title"><i class="fa-solid fa-bag-shopping"></i> Finalizar Pedido</h2>
       <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
@@ -993,11 +1041,11 @@
 <!-- ============================================================
      MODAL: DETALHE DO PEDIDO (usado pelo cliente e pelo admin)
 ============================================================= -->
-<div id="modal-order-detail" class="modal">
+<div id="modal-order-detail" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="modal-order-title">
   <div class="modal__backdrop" data-close-modal></div>
   <div class="modal__dialog modal__dialog--wide">
     <div class="modal__header">
-      <h2><i class="fa-solid fa-receipt"></i> Detalhe do Pedido</h2>
+      <h2 id="modal-order-title"><i class="fa-solid fa-receipt"></i> Detalhe do Pedido</h2>
       <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>
     </div>
     <div class="modal__body">
@@ -1009,7 +1057,7 @@
 <!-- ============================================================
      MODAL: FORMULÁRIO DE PRODUTO (admin — criar/editar)
 ============================================================= -->
-<div id="modal-product-form" class="modal">
+<div id="modal-product-form" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="product-form-title">
   <div class="modal__backdrop" data-close-modal></div>
   <div class="modal__dialog">
     <div class="modal__header">
@@ -1116,36 +1164,5 @@
 <script src="js/adminPanel.js"></script>
 <script src="js/app.js"></script>
 
-<!-- ============================================================
-     Contador da faixa "Oferta Relâmpago" (puramente decorativo,
-     conta até a meia-noite local — não interfere em nenhum módulo)
-============================================================= -->
-<script>
-(function () {
-  'use strict';
-  function tick() {
-    const el = document.getElementById('flash-sale-countdown');
-    if (!el) return;
-    const now = new Date();
-    const midnight = new Date(now);
-    midnight.setHours(24, 0, 0, 0);
-    const diff = Math.max(0, midnight - now);
-
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-
-    const pad = (n) => String(n).padStart(2, '0');
-    const hoursEl = el.querySelector('[data-timer="hours"]');
-    const minutesEl = el.querySelector('[data-timer="minutes"]');
-    const secondsEl = el.querySelector('[data-timer="seconds"]');
-    if (hoursEl) hoursEl.textContent = pad(hours);
-    if (minutesEl) minutesEl.textContent = pad(minutes);
-    if (secondsEl) secondsEl.textContent = pad(seconds);
-  }
-  tick();
-  setInterval(tick, 1000);
-})();
-</script>
 </body>
 </html>

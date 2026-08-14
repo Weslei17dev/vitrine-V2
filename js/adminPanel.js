@@ -14,6 +14,7 @@
   let pollingHandle = null;
   let bootstrapped = false; // evita notificar pedidos que já existiam ao abrir o painel
   let editingProductId = null;
+  let cachedCustomers = [];
   let currentProductImage = null; // dataURL da foto enviada no formulário de produto
   let currentProductGallery = []; // dataURLs das fotos adicionais (galeria da página do produto)
 
@@ -98,11 +99,22 @@
   // PEDIDOS
   // ==========================================================================
   const ALL_STATUSES = [...DataService.Orders.STATUS_FLOW, DataService.Orders.STATUS_CANCELLED];
+  const STATUS_TRANSITIONS = {
+    'Aguardando Pagamento': ['Aguardando Confirmação', 'Pago', 'Cancelado'],
+    'Aguardando Confirmação': ['Aguardando Pagamento', 'Pago', 'Cancelado'],
+    Pago: ['Em Produção', 'Cancelado'],
+    'Em Produção': ['Enviado', 'Cancelado'],
+    Enviado: ['Finalizado'],
+    Finalizado: [],
+    Cancelado: []
+  };
 
   function statusSelectHtml(order) {
+    const options = [order.status, ...(STATUS_TRANSITIONS[order.status] || [])]
+      .filter((status, index, list) => ALL_STATUSES.includes(status) && list.indexOf(status) === index);
     return `
-      <select class="status-select" data-action="change-status" data-id="${order.id}">
-        ${ALL_STATUSES.map(
+      <select class="status-select" data-action="change-status" data-id="${order.id}" ${options.length === 1 ? 'disabled' : ''}>
+        ${options.map(
           (s) => `<option value="${Utils.escapeHtml(s)}" ${s === order.status ? 'selected' : ''}>${Utils.escapeHtml(s)}</option>`
         ).join('')}
       </select>`;
@@ -144,6 +156,9 @@
     DataService.Orders.updateStatus(orderId, newStatus).then(() => {
       Utils.showToast(`Status do pedido atualizado para "${newStatus}".`, 'success');
       loadAll(); // atualiza dashboard/tabelas imediatamente
+    }).catch((err) => {
+      Utils.showToast(err.message, 'error');
+      loadOrdersOnly();
     });
   }
 
@@ -151,9 +166,10 @@
   // PRODUTOS (CRUD completo — parte do "acesso total" do administrador)
   // ==========================================================================
   function productRowHtml(product) {
-    const thumb = product.image
-      ? `<img class="product-icon-badge product-icon-badge--photo" src="${product.image}" alt="">`
-      : `<span class="product-icon-badge" style="background:${product.color}22">${product.icon}</span>`;
+    const safeImage = Utils.safeImageSrc(product.image);
+    const thumb = safeImage
+      ? `<img class="product-icon-badge product-icon-badge--photo" src="${Utils.escapeHtml(safeImage)}" alt="">`
+      : `<span class="product-icon-badge" style="background:${Utils.safeColor(product.color)}22">${Utils.escapeHtml(product.icon)}</span>`;
     return `
       <tr data-id="${product.id}">
         <td>${thumb}</td>
@@ -170,8 +186,8 @@
           <button class="btn-icon" data-action="edit-product" data-id="${product.id}" title="Editar">
             <i class="fa-solid fa-pen"></i>
           </button>
-          <button class="btn-icon btn-icon--danger" data-action="delete-product" data-id="${product.id}" title="Excluir">
-            <i class="fa-solid fa-trash"></i>
+          <button class="btn-icon btn-icon--danger" data-action="delete-product" data-id="${product.id}" title="Desativar" ${product.active === false ? 'disabled' : ''}>
+            <i class="fa-solid fa-ban"></i>
           </button>
         </td>
       </tr>`;
@@ -224,7 +240,7 @@
     const removeBtn = document.getElementById('prod-image-remove');
     if (!preview) return;
     if (currentProductImage) {
-      preview.innerHTML = `<img src="${currentProductImage}" alt="">`;
+      preview.innerHTML = `<img src="${Utils.escapeHtml(Utils.safeImageSrc(currentProductImage))}" alt="">`;
       if (removeBtn) removeBtn.classList.remove('is-hidden');
     } else {
       preview.innerHTML = '<i class="fa-solid fa-image"></i>';
@@ -235,12 +251,10 @@
   function handleProductImageInput(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      currentProductImage = reader.result;
+    Utils.compressImageFile(file).then((imageData) => {
+      currentProductImage = imageData;
       updateProductImagePreview();
-    };
-    reader.readAsDataURL(file);
+    }).catch((err) => Utils.showToast(err.message, 'error'));
     e.target.value = ''; // permite reenviar o mesmo arquivo depois, se necessário
   }
 
@@ -259,7 +273,7 @@
         <div class="repeatable-row repeatable-row--gallery">
           <div class="image-upload image-upload--row">
             <div class="image-upload__preview repeatable-row__preview">
-              ${src ? `<img src="${src}" alt="">` : '<i class="fa-solid fa-image"></i>'}
+              ${Utils.safeImageSrc(src) ? `<img src="${Utils.escapeHtml(Utils.safeImageSrc(src))}" alt="">` : '<i class="fa-solid fa-image"></i>'}
             </div>
             <label class="btn btn--outline btn--sm image-upload__btn">
               <i class="fa-solid fa-upload"></i> ${src ? 'Trocar' : 'Enviar'}
@@ -278,12 +292,10 @@
         const idx = parseInt(input.dataset.galleryImage, 10);
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          currentProductGallery[idx] = reader.result;
+        Utils.compressImageFile(file).then((imageData) => {
+          currentProductGallery[idx] = imageData;
           renderProductGalleryRows();
-        };
-        reader.readAsDataURL(file);
+        }).catch((err) => Utils.showToast(err.message, 'error'));
       });
     });
     container.querySelectorAll('[data-gallery-remove]').forEach((btn) => {
@@ -325,21 +337,21 @@
       Utils.showToast(editingProductId ? 'Produto atualizado.' : 'Produto criado.', 'success');
       editingProductId = null;
       loadProducts();
-      if (global.ProductsModule) global.ProductsModule.loadAndRender();
-    });
+      if (global.ProductsModule) global.ProductsModule.loadAndRender(true);
+    }).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
   function handleDeleteProduct(productId) {
-    if (!confirm('Tem certeza que deseja excluir este produto?')) return;
+    if (!confirm('Tem certeza que deseja desativar este produto? Ele deixará de aparecer na loja.')) return;
     DataService.Products.remove(productId).then(() => {
-      Utils.showToast('Produto removido.', 'info');
+      Utils.showToast('Produto desativado.', 'info');
       loadProducts();
-      if (global.ProductsModule) global.ProductsModule.loadAndRender();
-    });
+      if (global.ProductsModule) global.ProductsModule.loadAndRender(true);
+    }).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
   function loadProducts() {
-    DataService.Products.getAll().then(renderProductsTable);
+    return DataService.Products.getAllAdmin().then(renderProductsTable).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
   // ==========================================================================
@@ -353,7 +365,8 @@
   function updateSingleImagePreview(previewId, imageUrl) {
     const preview = document.getElementById(previewId);
     if (!preview) return;
-    preview.innerHTML = imageUrl ? `<img src="${imageUrl}" alt="">` : '<i class="fa-solid fa-image"></i>';
+    const safeImage = Utils.safeImageSrc(imageUrl);
+    preview.innerHTML = safeImage ? `<img src="${Utils.escapeHtml(safeImage)}" alt="">` : '<i class="fa-solid fa-image"></i>';
   }
 
   function renderCarouselRows() {
@@ -371,7 +384,7 @@
         <div class="repeatable-row">
           <div class="image-upload image-upload--row">
             <div class="image-upload__preview repeatable-row__preview" id="sc-carousel-preview-${i}">
-              ${slide.image ? `<img src="${slide.image}" alt="">` : '<i class="fa-solid fa-image"></i>'}
+              ${Utils.safeImageSrc(slide.image) ? `<img src="${Utils.escapeHtml(Utils.safeImageSrc(slide.image))}" alt="">` : '<i class="fa-solid fa-image"></i>'}
             </div>
             <label class="btn btn--outline btn--sm image-upload__btn">
               <i class="fa-solid fa-upload"></i> Imagem
@@ -393,12 +406,10 @@
         const idx = parseInt(input.dataset.carouselImage, 10);
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          siteCarouselSlides[idx].image = reader.result;
+        Utils.compressImageFile(file).then((imageData) => {
+          siteCarouselSlides[idx].image = imageData;
           renderCarouselRows();
-        };
-        reader.readAsDataURL(file);
+        }).catch((err) => Utils.showToast(err.message, 'error'));
       });
     });
     container.querySelectorAll('[data-carousel-alt]').forEach((input) => {
@@ -460,7 +471,7 @@
     const form = document.getElementById('form-site-content');
     if (!form) return;
 
-    DataService.SiteContent.get().then((content) => {
+    return DataService.SiteContent.getAdmin().then((content) => {
       form.elements['theme-bg'].value = content.theme.bg || '#150A10';
       form.elements['theme-surface'].value = content.theme.surface || '#211019';
       form.elements['theme-primary'].value = content.theme.primary || '#FF3D82';
@@ -510,7 +521,7 @@
       form.elements['footer-email'].value = content.footer.email || '';
       form.elements['footer-hours1'].value = content.footer.hours1 || '';
       form.elements['footer-hours2'].value = content.footer.hours2 || '';
-    });
+    }).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
   function handleSiteContentFormSubmit(e) {
@@ -580,7 +591,7 @@
     DataService.SiteContent.update(partial)
       .then(() => {
         Utils.showToast('Personalização salva! Já está valendo na loja.', 'success');
-        if (global.SiteContentModule) global.SiteContentModule.render();
+        if (global.SiteContentModule) global.SiteContentModule.render(true);
       })
       .catch(() => Utils.showToast('Não foi possível salvar. Tente novamente.', 'error'))
       .finally(() => submitBtns.forEach((btn) => (btn.disabled = false)));
@@ -590,7 +601,7 @@
     if (!confirm('Restaurar todos os textos e imagens da loja para o padrão original? Isso substitui suas personalizações atuais.')) return;
     DataService.SiteContent.resetDefaults().then(() => {
       Utils.showToast('Personalização restaurada ao padrão.', 'info');
-      if (global.SiteContentModule) global.SiteContentModule.render();
+      if (global.SiteContentModule) global.SiteContentModule.render(true);
       loadSiteContentForm();
     });
   }
@@ -623,12 +634,10 @@
       aboutImageInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          siteAboutImage = reader.result;
+        Utils.compressImageFile(file).then((imageData) => {
+          siteAboutImage = imageData;
           updateSingleImagePreview('sc-about-image-preview', siteAboutImage);
-        };
-        reader.readAsDataURL(file);
+        }).catch((err) => Utils.showToast(err.message, 'error'));
       });
     }
 
@@ -637,12 +646,10 @@
       spotlightImageInput.addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          siteSpotlightImage = reader.result;
+        Utils.compressImageFile(file).then((imageData) => {
+          siteSpotlightImage = imageData;
           updateSingleImagePreview('sc-spotlight-image-preview', siteSpotlightImage);
-        };
-        reader.readAsDataURL(file);
+        }).catch((err) => Utils.showToast(err.message, 'error'));
       });
     }
   }
@@ -692,7 +699,7 @@
       if (!knownOrderIds.has(order.id)) {
         knownOrderIds.add(order.id);
         notifyNewOrder(order);
-        DataService.Orders.markSeenByAdmin(order.id);
+        DataService.Orders.markSeenByAdmin(order.id).catch(() => {});
       }
     });
   }
@@ -703,17 +710,30 @@
   function loadAll() {
     return Promise.all([DataService.Orders.getAll(), DataService.Customers.getAll()]).then(
       ([orders, customers]) => {
+        cachedCustomers = customers;
         checkForNewOrders(orders);
         renderDashboard(orders, customers);
         renderCustomersTable(customers);
         renderOrdersTable(orders);
       }
-    );
+    ).catch((err) => Utils.showToast(err.message, 'error'));
+  }
+
+  function loadOrdersOnly() {
+    return DataService.Orders.getAll().then((orders) => {
+      checkForNewOrders(orders);
+      renderDashboard(orders, cachedCustomers);
+      renderOrdersTable(orders);
+    }).catch(() => {});
+  }
+
+  function enter() {
+    return Promise.all([loadAll(), loadProducts(), loadSiteContentForm()]);
   }
 
   function startPolling() {
     stopPolling();
-    pollingHandle = setInterval(loadAll, 3000);
+    pollingHandle = setInterval(loadOrdersOnly, 15000);
   }
 
   function stopPolling() {
@@ -748,7 +768,7 @@
         const editBtn = e.target.closest('[data-action="edit-product"]');
         const delBtn = e.target.closest('[data-action="delete-product"]');
         if (editBtn) {
-          DataService.Products.getById(editBtn.dataset.id).then(openProductForm);
+          DataService.Products.getByIdAdmin(editBtn.dataset.id).then(openProductForm).catch((err) => Utils.showToast(err.message, 'error'));
         }
         if (delBtn) {
           handleDeleteProduct(delBtn.dataset.id);
@@ -798,12 +818,11 @@
     wireEvents();
     wireSiteContentForm();
     switchTab('dashboard');
-    loadProducts();
-    loadSiteContentForm();
   }
 
   global.AdminPanelModule = {
     init,
+    enter,
     loadAll,
     startPolling,
     stopPolling,

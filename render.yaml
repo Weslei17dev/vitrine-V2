@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: brincar-de-desejo-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: PG_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_ISSUER
+        value: brincar-de-desejo-api
+      - key: JWT_AUDIENCE
+        value: brincar-de-desejo-web
+      - key: JWT_EXPIRES_IN
+        value: 2h
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NAME
+        value: Administrador

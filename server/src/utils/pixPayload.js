@@ -7,6 +7,7 @@
    ============================================================================ */
 
 function tlv(id, value) {
+  if (String(value).length > 99) throw new Error(`Campo PIX ${id} ultrapassa o limite permitido.`);
   const length = String(value.length).padStart(2, '0');
   return `${id}${length}${value}`;
 }
@@ -34,7 +35,26 @@ function crc16(payload) {
 }
 
 function build({ chave, nome, cidade, valor, txid }) {
-  const merchantAccount = tlv('00', 'br.gov.bcb.pix') + tlv('01', String(chave || '').trim());
+  const pixKey = String(chave || '').trim();
+  const merchantName = sanitize(nome, 25);
+  const merchantCity = sanitize(cidade, 15);
+  const amount = Number(valor);
+
+  if (!pixKey || pixKey === 'SUA_CHAVE_PIX_AQUI' || pixKey.length > 77 || /\s/.test(pixKey)) {
+    const error = new Error('A chave PIX da loja não está configurada corretamente.');
+    error.status = 503;
+    throw error;
+  }
+  if (merchantName === '-' || merchantCity === '-') {
+    const error = new Error('Nome e cidade do beneficiário PIX precisam ser configurados.');
+    error.status = 503;
+    throw error;
+  }
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 99999999.99) {
+    throw new Error('Valor PIX inválido.');
+  }
+
+  const merchantAccount = tlv('00', 'br.gov.bcb.pix') + tlv('01', pixKey);
   const txidClean = String(txid || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 25) || '***';
   const additionalData = tlv('05', txidClean);
 
@@ -43,10 +63,10 @@ function build({ chave, nome, cidade, valor, txid }) {
     tlv('26', merchantAccount) +
     tlv('52', '0000') +
     tlv('53', '986') +
-    tlv('54', Number(valor || 0).toFixed(2)) +
+    tlv('54', amount.toFixed(2)) +
     tlv('58', 'BR') +
-    tlv('59', sanitize(nome, 25)) +
-    tlv('60', sanitize(cidade, 15)) +
+    tlv('59', merchantName) +
+    tlv('60', merchantCity) +
     tlv('62', additionalData);
 
   payload += '6304';

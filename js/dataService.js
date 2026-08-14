@@ -27,17 +27,17 @@
   // --------------------------------------------------------------------------
   // Helpers de storage local (usados só pela sessão e pelo carrinho)
   // --------------------------------------------------------------------------
-  function readJSON(key, fallback) {
+  function readJSON(storage, key, fallback) {
     try {
-      const raw = localStorage.getItem(key);
+      const raw = storage.getItem(key);
       return raw ? JSON.parse(raw) : fallback;
     } catch (err) {
       return fallback;
     }
   }
 
-  function writeJSON(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+  function writeJSON(storage, key, value) {
+    storage.setItem(key, JSON.stringify(value));
   }
 
   function resolveAsync(value) {
@@ -48,7 +48,7 @@
   // Cliente HTTP: monta a URL, injeta o token de login e trata erros
   // --------------------------------------------------------------------------
   function getToken() {
-    const session = readJSON(STORAGE_KEYS.SESSION, null);
+    const session = readJSON(sessionStorage, STORAGE_KEYS.SESSION, null);
     return session ? session.token : null;
   }
 
@@ -68,6 +68,10 @@
     return fetch(API_BASE_URL + path, opts).then((response) =>
       response.json().catch(() => ({})).then((body) => {
         if (!response.ok) {
+          if (response.status === 401) {
+            sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+            global.dispatchEvent(new CustomEvent('vitrine:session-expired'));
+          }
           throw new Error(body.message || 'Não foi possível completar a operação. Tente novamente.');
         }
         return body;
@@ -102,17 +106,57 @@
     },
 
     saveSession(user) {
-      writeJSON(STORAGE_KEYS.SESSION, { token: lastAuthToken, user });
+      writeJSON(sessionStorage, STORAGE_KEYS.SESSION, { token: lastAuthToken, user });
       return resolveAsync(user);
     },
 
     getSession() {
-      const session = readJSON(STORAGE_KEYS.SESSION, null);
+      const session = readJSON(sessionStorage, STORAGE_KEYS.SESSION, null);
       return session ? session.user : null;
     },
 
+    restoreSession() {
+      const session = readJSON(sessionStorage, STORAGE_KEYS.SESSION, null);
+      if (!session || !session.token) return resolveAsync(null);
+      return apiFetch('/api/auth/me')
+        .then((user) => {
+          writeJSON(sessionStorage, STORAGE_KEYS.SESSION, { token: session.token, user });
+          return user;
+        })
+        .catch(() => {
+          sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+          return null;
+        });
+    },
+
+    updateProfile(payload) {
+      return apiFetch('/api/auth/me', { method: 'PATCH', body: JSON.stringify(payload) }).then((user) => {
+        const session = readJSON(sessionStorage, STORAGE_KEYS.SESSION, null);
+        if (session) writeJSON(sessionStorage, STORAGE_KEYS.SESSION, { token: session.token, user });
+        return user;
+      });
+    },
+
+    changePassword(currentPassword, newPassword) {
+      return apiFetch('/api/auth/change-password', {
+        method: 'POST', body: JSON.stringify({ currentPassword, newPassword })
+      }).then((data) => {
+        lastAuthToken = data.token;
+        writeJSON(sessionStorage, STORAGE_KEYS.SESSION, { token: data.token, user: data.user });
+        return data.user;
+      });
+    },
+
+    deleteAccount(password) {
+      return apiFetch('/api/auth/me', { method: 'DELETE', body: JSON.stringify({ password }) }).then(() => {
+        sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+        return true;
+      });
+    },
+
     clearSession() {
-      localStorage.removeItem(STORAGE_KEYS.SESSION);
+      sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+      lastAuthToken = null;
       return resolveAsync(true);
     }
   };
@@ -121,11 +165,17 @@
   // REPOSITÓRIO: Produtos
   // ============================================================================
   const ProductRepository = {
-    getAll() {
-      return apiFetch('/api/products');
+    getAll(force) {
+      return apiFetch(`/api/products${force ? `?v=${Date.now()}` : ''}`);
     },
     getById(id) {
       return apiFetch(`/api/products/${id}`);
+    },
+    getAllAdmin() {
+      return apiFetch('/api/products/admin/all');
+    },
+    getByIdAdmin(id) {
+      return apiFetch(`/api/products/admin/${id}`);
     },
     create(payload) {
       return apiFetch('/api/products', { method: 'POST', body: JSON.stringify(payload) });
@@ -143,10 +193,13 @@
   // ============================================================================
   const CartRepository = {
     get(userId) {
-      return readJSON(STORAGE_KEYS.CART_PREFIX + userId, []);
+      return readJSON(localStorage, STORAGE_KEYS.CART_PREFIX + (userId || 'guest'), []);
     },
     save(userId, items) {
-      writeJSON(STORAGE_KEYS.CART_PREFIX + userId, items);
+      writeJSON(localStorage, STORAGE_KEYS.CART_PREFIX + (userId || 'guest'), items);
+    },
+    clear(userId) {
+      localStorage.removeItem(STORAGE_KEYS.CART_PREFIX + (userId || 'guest'));
     }
   };
 
@@ -160,8 +213,12 @@
     STATUS_FLOW,
     STATUS_CANCELLED,
 
-    create({ items, total }) {
-      return apiFetch('/api/orders', { method: 'POST', body: JSON.stringify({ items, total }) });
+    create({ items, idempotencyKey }) {
+      return apiFetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Idempotency-Key': idempotencyKey },
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })) })
+      });
     },
     getAll() {
       return apiFetch('/api/orders');
@@ -200,22 +257,21 @@
       bg: '#150A10', surface: '#211019', primary: '#FF3D82', primaryDark: '#C81760',
       accent: '#FF3B4E', accentDark: '#C4172A', text: '#F5EBEF', textMuted: '#B49AA8', dark: '#0B0509'
     },
-    pix: { chave: 'SUA_CHAVE_PIX_AQUI', nomeBeneficiario: 'BRINCAR DE DESEJO', cidadeBeneficiario: 'SAO PAULO' },
+    pix: { chave: '', nomeBeneficiario: '', cidadeBeneficiario: '' },
     hero: {
       eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
       title: 'Desejo, prazer e sedução\nem um só lugar.',
-      subtitle: 'Produtos selecionados com cuidado, entrega discreta e atendimento sem julgamentos. Veja o catálogo à vontade — o login só é pedido na hora de fechar o pedido.',
+      subtitle: 'Produtos selecionados com cuidado, entrega discreta e atendimento sem julgamentos. Monte seu carrinho à vontade — o login é solicitado somente para finalizar o pedido.',
       ctaText: 'Ver produtos'
     },
     carousel: [
       { image: 'img/promo-dessensibilizante.jpg', alt: 'Dessensibilizante — conforto é prioridade para iniciantes ou amadores' },
       { image: 'img/promo-bdsm.jpg', alt: 'BDSM — fetiches escondidos' },
-      { image: 'img/promo-acessorios.jpg', alt: 'Acessórios — fetiches escondidos, quanto mais enfeite melhor' },
-      { image: 'img/promo-desconto.jpg', alt: '10% de desconto na primeira compra, cupom 10DE10' }
+      { image: 'img/promo-acessorios.jpg', alt: 'Acessórios para momentos especiais' }
     ],
     flashSale: {
-      tag: 'Oferta Relâmpago', title: 'Aproveite antes que acabe!',
-      description: 'Selecionamos os itens mais desejados com condições especiais por tempo limitado.'
+      tag: 'Seleção Especial', title: 'Descubra os favoritos da loja',
+      description: 'Produtos selecionados para tornar seus momentos ainda mais especiais.'
     },
     about: {
       image: 'img/quem-somos.jpg', eyebrow: 'Quem somos',
@@ -233,10 +289,10 @@
     faq: [
       { q: 'Minha compra é realmente discreta?', a: 'Sim. Todo pedido é enviado em embalagem neutra, sem qualquer identificação da loja ou do conteúdo, tanto na caixa quanto na nota fiscal e no nome do remetente.' },
       { q: 'Preciso criar conta para ver os produtos?', a: 'Não. Você pode navegar por todo o catálogo, buscar e filtrar produtos livremente sem login. A conta só é pedida na hora de finalizar o pedido.' },
-      { q: 'Quais formas de pagamento vocês aceitam?', a: 'Trabalhamos com PIX via QR Code, com aprovação em poucos minutos após o pagamento.' },
-      { q: 'Em quanto tempo meu pedido chega?', a: 'Após a aprovação do pagamento, o pedido é preparado e enviado rapidamente. Você acompanha cada etapa em tempo real na sua área do cliente.' },
+      { q: 'Quais formas de pagamento vocês aceitam?', a: 'O pagamento disponível no site é PIX. A confirmação é realizada pela equipe após a conferência do recebimento.' },
+      { q: 'Como acompanho meu pedido?', a: 'Acesse Meus Pedidos para consultar o status informado pela equipe.' },
       { q: 'Posso trocar ou devolver um produto?', a: 'Sim, seguindo nossa política de trocas e devoluções. Entre em contato com a Central de Atendimento informando o número do seu pedido.' },
-      { q: 'Meus dados estão seguros?', a: 'Sim. Seus dados são usados apenas para processar o pedido e nunca são compartilhados. Todo o site utiliza conexão segura.' }
+      { q: 'Como meus dados são utilizados?', a: 'Os dados são utilizados para manter sua conta, processar o pedido, realizar a entrega e prestar atendimento.' }
     ],
     footer: {
       about: 'Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.',
@@ -246,17 +302,17 @@
   };
 
   const SiteContentRepository = {
-    get() {
-      return apiFetch('/api/site-content');
+    get(force) {
+      return apiFetch(`/api/site-content${force ? `?v=${Date.now()}` : ''}`);
+    },
+    getAdmin() {
+      return apiFetch('/api/site-content/admin');
     },
     update(partial) {
       return apiFetch('/api/site-content', { method: 'PUT', body: JSON.stringify(partial) });
     },
     resetDefaults() {
-      return apiFetch('/api/site-content/reset', {
-        method: 'POST',
-        body: JSON.stringify({ defaults: SITE_CONTENT_DEFAULTS })
-      });
+      return apiFetch('/api/site-content/reset', { method: 'POST' });
     }
   };
 
@@ -283,6 +339,7 @@
     Customers: CustomerRepository,
     SiteContent: SiteContentRepository,
     Reviews: ReviewRepository,
+    SITE_CONTENT_DEFAULTS,
     KEYS: STORAGE_KEYS
   };
 })(window);
