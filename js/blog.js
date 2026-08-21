@@ -128,7 +128,7 @@
     return `
       <span class="section-eyebrow">${Utils.escapeHtml(post.category)}</span>
       <h1>${Utils.escapeHtml(post.title)}</h1>
-      <p class="text-muted">Publicado em ${Utils.escapeHtml(post.date)} · Conteúdo educativo para maiores de 18 anos</p>
+      <p class="text-muted">Publicado em ${Utils.escapeHtml(post.date)} · Conteúdo educativo</p>
       <img class="blog-article__cover" src="${Utils.escapeHtml(post.image)}" alt="${Utils.escapeHtml(post.alt)}">
       <p>${Utils.escapeHtml(post.excerpt)}</p>
       ${sections}

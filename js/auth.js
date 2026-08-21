@@ -97,12 +97,6 @@
       valid = false;
     }
 
-    const adultConfirmation = form.elements.adultConfirmed;
-    if (!adultConfirmation.checked) {
-      showFieldError(adultConfirmation, 'Confirme a maioridade e a leitura dos termos.');
-      valid = false;
-    }
-
     return valid;
   }
 
@@ -125,8 +119,7 @@
       address: form.elements.address.value,
       city: form.elements.city.value,
       state: form.elements.state.value,
-      zip: form.elements.zip.value,
-      adultConfirmed: form.elements.adultConfirmed.checked
+      zip: form.elements.zip.value
     };
 
     setButtonLoading(submitBtn, true, 'Criando conta...');

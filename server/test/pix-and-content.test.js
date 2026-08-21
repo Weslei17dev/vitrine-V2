@@ -19,10 +19,10 @@ test('gera payload PIX com valor calculado', () => {
 });
 
 test('recusa PIX sem configuração', () => {
-  assert.throws(() => pixPayload.build({ chave: '', nome: '', cidade: '', valor: 10 }), /não está configurada/);
+  assert.throws(() => pixPayload.build({ chave: '', nome: '', cidade: '', valor: 10 }), /configure uma chave PIX válida/);
   assert.throws(() => pixPayload.build({
     chave: 'SUA_CHAVE_PIX_AQUI', nome: 'Loja', cidade: 'Arapongas', valor: 10
-  }), /não está configurada/);
+  }), /configure uma chave PIX válida/);
 });
 
 test('restaura campos ausentes do conteúdo sem apagar personalizações', () => {

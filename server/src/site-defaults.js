@@ -56,7 +56,7 @@ const SITE_CONTENT_DEFAULTS = {
     { q: 'Como meus dados são utilizados?', a: 'Os dados são utilizados para manter sua conta, processar o pedido, realizar a entrega e prestar atendimento.' }
   ],
   footer: {
-    about: 'Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.',
+    about: 'Loja online de bem-estar íntimo, com pagamento via PIX e envio discreto.',
     legalName: '', document: '', address: '',
     phone: '(11) 4810-6810', email: 'sac@brincardedesejo.com.br',
     hours1: 'Seg. a Sex. das 8h às 18h', hours2: 'Sábados das 8h às 12h'

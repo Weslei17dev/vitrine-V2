@@ -37,7 +37,7 @@ async function authenticate(req) {
   }
 
   const result = await pool.query(
-    'SELECT id, name, email, role, phone, address, city, state, zip, adult_confirmed_at, token_version FROM users WHERE id = $1',
+    'SELECT id, name, email, role, phone, address, city, state, zip, token_version FROM users WHERE id = $1',
     [payload.sub]
   );
   const user = result.rows[0];

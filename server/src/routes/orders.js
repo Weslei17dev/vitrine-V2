@@ -208,7 +208,7 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
        RETURNING *`,
       [
         number, user.id, user.name, user.phone, user.address, user.city, user.state, user.zip,
-        canonicalItems, subtotalCents / 100, shippingCents / 100, total, history, payload,
+        JSON.stringify(canonicalItems), subtotalCents / 100, shippingCents / 100, total, JSON.stringify(history), payload,
         idempotencyKey, dateStr, timeStr, expiresAt
       ]
     );
@@ -240,7 +240,47 @@ router.get('/', requireAdmin, async (req, res, next) => {
     await expirePendingOrders();
     const limit = parseLimit(req.query.limit, 200, 500);
     const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
-    const result = await pool.query('SELECT * FROM orders ORDER BY created_at DESC LIMIT $1 OFFSET $2', [limit, offset]);
+    const values = [];
+    const where = [];
+    const add = (value) => { values.push(value); return `$${values.length}`; };
+    const client = String(req.query.client || '').trim().slice(0, 120);
+    const product = String(req.query.product || '').trim().slice(0, 160);
+    const status = String(req.query.status || '').trim();
+    const from = String(req.query.from || '').trim();
+    const to = String(req.query.to || '').trim();
+    const minValue = req.query.minValue === '' || req.query.minValue == null ? null : Number(req.query.minValue);
+    const maxValue = req.query.maxValue === '' || req.query.maxValue == null ? null : Number(req.query.maxValue);
+
+    if (status) {
+      if (!ALL_STATUSES.has(status)) throw new V.ValidationError('Status de filtro inválido.');
+      where.push(`status=${add(status)}`);
+    }
+    if (client) where.push(`customer_name ILIKE ${add(`%${client}%`)}`);
+    if (product) where.push(`EXISTS (SELECT 1 FROM jsonb_array_elements(items) item WHERE item->>'name' ILIKE ${add(`%${product}%`)})`);
+    if (from) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(from)) throw new V.ValidationError('Data inicial inválida.');
+      where.push(`created_at >= ${add(`${from}T00:00:00-03:00`)}::timestamptz`);
+    }
+    if (to) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(to)) throw new V.ValidationError('Data final inválida.');
+      where.push(`created_at < (${add(`${to}T00:00:00-03:00`)}::timestamptz + interval '1 day')`);
+    }
+    if (minValue != null) {
+      if (!Number.isFinite(minValue) || minValue < 0) throw new V.ValidationError('Valor mínimo inválido.');
+      where.push(`total >= ${add(minValue)}`);
+    }
+    if (maxValue != null) {
+      if (!Number.isFinite(maxValue) || maxValue < 0) throw new V.ValidationError('Valor máximo inválido.');
+      where.push(`total <= ${add(maxValue)}`);
+    }
+    if (minValue != null && maxValue != null && minValue > maxValue) throw new V.ValidationError('O valor mínimo não pode ser maior que o máximo.');
+
+    values.push(limit, offset);
+    const result = await pool.query(
+      `SELECT * FROM orders ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+       ORDER BY created_at DESC LIMIT $${values.length - 1} OFFSET $${values.length}`,
+      values
+    );
     res.json(result.rows.map(toPublicOrder));
   } catch (err) {
     next(err);
@@ -400,7 +440,7 @@ router.patch('/:id/status', requireAdmin, async (req, res, next) => {
       `UPDATE orders SET status=$1, status_history=$2, stock_restored=$3, cancel_reason=$4,
          expires_at=$5, payment_reported_at=CASE WHEN $1='Aguardando Pagamento' THEN NULL ELSE payment_reported_at END,
          updated_at=now() WHERE id=$6 RETURNING *`,
-      [status, history, stockRestored, status === STATUS_CANCELLED ? 'Cancelado pelo administrador' : null, renewedExpiry, id]
+      [status, JSON.stringify(history), stockRestored, status === STATUS_CANCELLED ? 'Cancelado pelo administrador' : null, renewedExpiry, id]
     );
     await client.query('COMMIT');
     await recordAudit(pool, {
@@ -451,7 +491,7 @@ router.patch('/:id/payment-reported', requireAuth, orderLimiter, async (req, res
     const updated = await client.query(
       `UPDATE orders SET status='Aguardando Confirmação', status_history=$1,
          payment_reported_at=now(), updated_at=now() WHERE id=$2 RETURNING *`,
-      [history, id]
+      [JSON.stringify(history), id]
     );
     await client.query('COMMIT');
     res.json(toPublicOrder(updated.rows[0]));

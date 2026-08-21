@@ -25,6 +25,7 @@
 
   function persist() {
     const userId = currentUserId();
+    if (!userId) return;
     DataService.Cart.save(userId, items);
   }
 
@@ -49,29 +50,18 @@
 
   function loadForCurrentUser() {
     const userId = currentUserId();
+    if (!userId) {
+      items = [];
+      renderAll();
+      return;
+    }
     items = sanitizeStoredItems(DataService.Cart.get(userId));
     persist();
     renderAll();
   }
 
-  function migrateGuestCart(userId) {
-    if (!userId) return;
-    const guestItems = sanitizeStoredItems(DataService.Cart.get(null));
-    const userItems = sanitizeStoredItems(DataService.Cart.get(userId));
-    const merged = new Map();
-    [...(Array.isArray(userItems) ? userItems : []), ...(Array.isArray(guestItems) ? guestItems : [])].forEach((item) => {
-      if (!item || !item.productId) return;
-      const current = merged.get(item.productId);
-      if (current) current.qty = Math.max(1, Math.min(maxQuantity(current) || 1, current.qty + (Number(item.qty) || 1)));
-      else merged.set(item.productId, Object.assign({}, item, { qty: Math.max(1, Math.min(99, Number(item.qty) || 1)) }));
-    });
-    items = Array.from(merged.values());
-    DataService.Cart.save(userId, items);
-    DataService.Cart.clear(null);
-    renderAll();
-  }
-
   function addItem(product) {
+    if (!currentUserId()) return false;
     const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
     if (stock < 1) return false;
     const existing = items.find((i) => i.productId === product.id);
@@ -284,7 +274,6 @@
     getItemCount,
     reconcile,
     loadForCurrentUser,
-    migrateGuestCart,
     renderAll
   };
 })(window);

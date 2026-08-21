@@ -12,6 +12,16 @@
   let pollingHandle = null;
   let lastSnapshot = '';
 
+  function renderAvatar(value) {
+    const preview = document.getElementById('account-avatar-preview');
+    const hidden = document.getElementById('account-avatar-value');
+    const safe = Utils.safeImageSrc(value || '');
+    if (hidden) hidden.value = safe;
+    if (preview) preview.innerHTML = safe
+      ? `<img src="${Utils.escapeHtml(safe)}" alt="Foto do perfil">`
+      : '<i class="fa-solid fa-user"></i>';
+  }
+
   function orderRowHtml(order) {
     const itemsPreview = order.items.map((i) => `${i.qty}x ${i.name}`).join(', ');
     return `
@@ -135,6 +145,21 @@
       });
       profileForm.elements.phone.addEventListener('input', (e) => { e.target.value = Utils.maskPhone(e.target.value); });
       profileForm.elements.zip.addEventListener('input', (e) => { e.target.value = Utils.maskCep(e.target.value); });
+
+      const avatarInput = document.getElementById('account-avatar-input');
+      if (avatarInput) avatarInput.addEventListener('change', async (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (!file) return;
+        try {
+          const image = await Utils.compressImageFile(file, { maxWidth: 512, maxHeight: 512, quality: 0.82 });
+          renderAvatar(image);
+        } catch (err) {
+          Utils.showToast(err.message || 'Não foi possível processar a foto.', 'error');
+        } finally {
+          e.target.value = '';
+        }
+      });
+      document.getElementById('account-avatar-remove')?.addEventListener('click', () => renderAvatar(''));
     }
 
     const passwordForm = document.getElementById('form-account-password');
@@ -150,18 +175,6 @@
         .catch((err) => Utils.showToast(err.message, 'error'));
     });
 
-    const deleteForm = document.getElementById('form-delete-account');
-    if (deleteForm) deleteForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      if (!confirm('Excluir definitivamente sua conta? Avaliações serão removidas e pedidos concluídos serão anonimizados. Pedidos em andamento precisam ser finalizados ou cancelados antes.')) return;
-      const userId = global.App.state.currentUser && global.App.state.currentUser.id;
-      DataService.Auth.deleteAccount(e.target.elements.password.value).then(() => {
-        if (userId) DataService.Cart.clear(userId);
-        global.App.setCurrentUser(null);
-        Utils.showToast('Conta excluída.', 'info');
-        global.App.navigate('store');
-      }).catch((err) => Utils.showToast(err.message, 'error'));
-    });
   }
 
   function populateAccountForm() {
@@ -171,6 +184,7 @@
     ['name', 'phone', 'address', 'city', 'state', 'zip'].forEach((field) => {
       if (form.elements[field]) form.elements[field].value = user[field] || '';
     });
+    renderAvatar(user.avatar || '');
   }
 
   function refresh() {

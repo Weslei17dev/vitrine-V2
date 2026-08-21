@@ -15,8 +15,6 @@
         <p>O site não solicita CPF no cadastro. Dados de pagamento bancário não são coletados: o pagamento ocorre no aplicativo da instituição financeira por meio de PIX.</p>
         <h3>Avaliações públicas</h3>
         <p>Avaliações são exibidas como “Cliente verificado”, sem nome completo, e somente depois de moderação. A data pública é limitada ao mês e ao ano.</p>
-        <h3>Exclusão e anonimização</h3>
-        <p>A conta pode ser excluída na área do cliente após a conclusão ou o cancelamento de pedidos em andamento. Na exclusão, avaliações vinculadas são removidas e os dados pessoais dos pedidos concluídos são anonimizados; informações comerciais sem identificação podem ser mantidas quando necessárias para obrigações legais e controles financeiros.</p>
         <h3>Segurança e direitos</h3>
         <p>Senhas são armazenadas em formato protegido e sessões podem ser encerradas após alteração de senha. O cliente pode consultar e corrigir seus dados na própria conta e usar o e-mail do rodapé para solicitar suporte sobre privacidade.</p>`
     },
@@ -24,7 +22,7 @@
       id: 'legal-terms',
       title: 'Termos de Uso',
       body: `
-        <p>O acesso ao catálogo e a compra são destinados exclusivamente a pessoas com 18 anos ou mais. Ao criar uma conta, o cliente confirma a maioridade e a veracidade dos dados de entrega.</p>
+        <p>Ao criar uma conta, o cliente confirma a veracidade dos dados de cadastro e entrega.</p>
         <h3>Conta e pedidos</h3>
         <p>O cliente é responsável por manter sua senha em sigilo. Preços, estoque e frete são confirmados pelo servidor antes da criação do pedido. Pedidos aguardando pagamento podem expirar no prazo informado e ter o estoque liberado automaticamente.</p>
         <h3>Conteúdo e uso responsável</h3>

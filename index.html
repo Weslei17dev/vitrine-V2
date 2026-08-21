@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.">
+<meta name="description" content="Loja online de bem-estar íntimo, com pagamento via PIX e envio discreto.">
 <meta name="theme-color" content="#1A1A1A">
 <meta property="og:locale" content="pt_BR">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Brincar de Desejo — Bem-estar íntimo com discrição">
-<meta property="og:description" content="Seleção de produtos para adultos, conteúdo educativo e acompanhamento de pedidos.">
+<meta property="og:description" content="Seleção de produtos de bem-estar íntimo, conteúdo educativo e acompanhamento de pedidos.">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'">
 <title>Brincar de Desejo — Loja &amp; Painel Administrativo</title>
@@ -25,19 +25,6 @@
 <script src="js/frameGuard.js"></script>
 </head>
 <body>
-
-<div id="age-gate" class="age-gate" role="dialog" aria-modal="true" aria-labelledby="age-gate-title">
-  <div class="age-gate__card">
-    <span class="brand brand--light">
-      <span class="brand__mark"><img src="img/brand-icon.jpg" alt=""></span>
-      <span class="brand__name">Brincar de Desejo</span>
-    </span>
-    <h1 id="age-gate-title">Conteúdo destinado a maiores de 18 anos</h1>
-    <p>Ao continuar, você confirma que possui 18 anos ou mais.</p>
-    <button type="button" id="age-confirm-btn" class="btn btn--primary btn--block">Tenho 18 anos ou mais</button>
-    <button type="button" id="age-leave-btn" class="btn btn--outline btn--block">Sair</button>
-  </div>
-</div>
 
 <!-- ============================================================
      CABEÇALHO DA LOJA (visível para visitante e cliente logado;
@@ -66,10 +53,10 @@
           <i class="fa-solid fa-cart-shopping"></i>
           <span id="cart-count-badge" class="count-badge is-hidden">0</span>
         </button>
-        <div class="user-chip">
-          <i class="fa-solid fa-circle-user"></i>
+        <button id="header-profile-btn" class="user-chip" type="button" aria-label="Abrir meu perfil">
+          <span id="header-user-avatar" class="user-avatar user-avatar--header"><i class="fa-solid fa-user"></i></span>
           <span id="header-user-name">Cliente</span>
-        </div>
+        </button>
         <button class="btn btn--outline btn--sm" data-action="logout">
           <i class="fa-solid fa-right-from-bracket"></i> Sair
         </button>
@@ -192,10 +179,7 @@
           </div>
 
           <div class="form-field form-field--span2 form-field--checkbox consent-field">
-            <label>
-              <input name="adultConfirmed" type="checkbox" value="true" required>
-              <span>Confirmo que tenho 18 anos ou mais e li a <a href="#" data-action="open-legal" data-legal-target="legal-privacy">Política de Privacidade</a> e os <a href="#" data-action="open-legal" data-legal-target="legal-terms">Termos de Uso</a>.</span>
-            </label>
+            <span>Ao criar a conta, você concorda com a <a href="#" data-action="open-legal" data-legal-target="legal-privacy">Política de Privacidade</a> e os <a href="#" data-action="open-legal" data-legal-target="legal-terms">Termos de Uso</a>.</span>
           </div>
         </div>
 
@@ -349,7 +333,7 @@
           <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
           <span class="brand__name">Brincar de Desejo</span>
         </span>
-        <p id="footer-about">Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.</p>
+        <p id="footer-about">Loja online de bem-estar íntimo, com pagamento via PIX e envio discreto.</p>
         <p id="footer-legal-info" class="store-footer__legal-info is-hidden"></p>
         <div class="store-footer__social"><a id="footer-email-icon-link" href="mailto:sac@brincardedesejo.com.br" aria-label="Enviar e-mail"><i class="fa-solid fa-envelope"></i></a></div>
       </div>
@@ -387,7 +371,7 @@
     </div>
 
     <div class="store-footer__bottom">
-      <p>Brincar de Desejo — Todos os direitos reservados. Venda proibida para menores de 18 anos.</p>
+      <p>Brincar de Desejo — Todos os direitos reservados.</p>
     </div>
   </footer>
 </section>
@@ -505,12 +489,22 @@
       <p>Acompanhe online o status informado pela equipe.</p>
     </div>
 
-    <details class="panel-card account-panel">
+    <details id="customer-account-panel" class="panel-card account-panel">
       <summary><i class="fa-solid fa-user-gear"></i> Minha conta e segurança</summary>
       <div class="account-panel__content">
         <form id="form-account-profile">
           <h2>Dados pessoais e entrega</h2>
           <div class="form-grid">
+            <div class="profile-photo-editor form-field--span2">
+              <div id="account-avatar-preview" class="profile-avatar-preview"><i class="fa-solid fa-user"></i></div>
+              <div class="profile-photo-editor__actions">
+                <label for="account-avatar-input" class="btn btn--outline btn--sm"><i class="fa-solid fa-camera"></i> Escolher foto</label>
+                <input id="account-avatar-input" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+                <button id="account-avatar-remove" type="button" class="btn btn--ghost btn--sm"><i class="fa-solid fa-trash"></i> Remover</button>
+                <input id="account-avatar-value" name="avatar" type="hidden">
+                <small>JPG, PNG ou WebP. A imagem será otimizada antes de salvar.</small>
+              </div>
+            </div>
             <div class="form-field form-field--span2"><label for="account-name">Nome</label><input id="account-name" name="name" autocomplete="name" required></div>
             <div class="form-field"><label for="account-phone">Telefone</label><input id="account-phone" name="phone" autocomplete="tel" inputmode="tel" required></div>
             <div class="form-field form-field--span2"><label for="account-address">Endereço</label><input id="account-address" name="address" autocomplete="street-address" required></div>
@@ -530,12 +524,6 @@
           <button type="submit" class="btn btn--outline btn--sm">Alterar senha e encerrar sessões antigas</button>
         </form>
 
-        <form id="form-delete-account" class="account-danger-zone">
-          <h2>Excluir minha conta</h2>
-          <p>Esta ação remove seus dados de cadastro. Os pedidos permanecem registrados sem vínculo com a conta.</p>
-          <div class="form-field"><label for="delete-account-password">Confirme sua senha</label><input id="delete-account-password" name="password" type="password" autocomplete="current-password" required></div>
-          <button type="submit" class="btn btn--danger btn--sm">Excluir conta definitivamente</button>
-        </form>
       </div>
     </details>
 
@@ -841,6 +829,17 @@
       <div class="admin-tab-panel" data-tab-panel="pedidos">
         <div class="panel-card">
           <h2><i class="fa-solid fa-clipboard-list"></i> Todos os pedidos</h2>
+          <form id="admin-orders-filters" class="order-filters">
+            <div class="form-field"><label for="orders-filter-from">Data inicial</label><input id="orders-filter-from" name="from" type="date"></div>
+            <div class="form-field"><label for="orders-filter-to">Data final</label><input id="orders-filter-to" name="to" type="date"></div>
+            <div class="form-field"><label for="orders-filter-client">Cliente</label><input id="orders-filter-client" name="client" type="search" placeholder="Nome do cliente"></div>
+            <div class="form-field"><label for="orders-filter-status">Status</label><select id="orders-filter-status" name="status"><option value="">Todos os status</option><option>Aguardando Pagamento</option><option>Aguardando Confirmação</option><option>Pago</option><option>Em Produção</option><option>Enviado</option><option>Finalizado</option><option>Cancelado</option></select></div>
+            <div class="form-field"><label for="orders-filter-product">Produto</label><input id="orders-filter-product" name="product" type="search" placeholder="Nome do produto"></div>
+            <div class="form-field"><label for="orders-filter-min">Valor mínimo</label><input id="orders-filter-min" name="minValue" type="number" min="0" step="0.01" placeholder="R$ 0,00"></div>
+            <div class="form-field"><label for="orders-filter-max">Valor máximo</label><input id="orders-filter-max" name="maxValue" type="number" min="0" step="0.01" placeholder="Sem limite"></div>
+            <div class="order-filters__actions"><button type="submit" class="btn btn--primary btn--sm"><i class="fa-solid fa-filter"></i> Aplicar filtros</button><button id="admin-orders-clear-filters" type="button" class="btn btn--outline btn--sm">Limpar</button></div>
+          </form>
+          <div id="admin-orders-filter-summary" class="order-filter-summary">Exibindo os pedidos mais recentes.</div>
           <div class="table-scroll">
             <table class="data-table">
               <thead>
@@ -1246,7 +1245,7 @@
 ============================================================= -->
 <div id="modal-product-form" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="product-form-title">
   <div class="modal__backdrop" data-close-modal></div>
-  <div class="modal__dialog">
+  <div class="modal__dialog modal__dialog--product">
     <div class="modal__header">
       <h2 id="product-form-title"><i class="fa-solid fa-box"></i> Novo Produto</h2>
       <button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button>

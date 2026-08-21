@@ -213,6 +213,12 @@
   }
 
   function handleAddToCart(productId) {
+    const user = global.App.state.currentUser;
+    if (!user || user.role !== 'client') {
+      Utils.showToast('Entre ou crie uma conta para adicionar produtos ao carrinho.', 'info');
+      global.App.navigate('login');
+      return;
+    }
     const product = state.all.find((p) => p.id === productId);
     if (!product) return;
     if (Number(product.stock) <= 0) {

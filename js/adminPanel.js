@@ -17,6 +17,7 @@
   let editingProductUpdatedAt = null;
   const PAGE_SIZE = 100;
   let cachedOrders = [];
+  let orderFilters = {};
   let cachedCustomers = [];
   let currentProductImage = null; // dataURL da foto enviada no formulário de produto
   let currentProductGallery = []; // dataURLs das fotos adicionais (galeria da página do produto)
@@ -138,12 +139,27 @@
     const tbody = document.getElementById('admin-orders-tbody');
     if (!tbody) return;
 
+    const summary = document.getElementById('admin-orders-filter-summary');
+    if (summary) {
+      const active = Object.values(orderFilters).some((value) => value !== '' && value != null);
+      summary.textContent = active
+        ? `${orders.length} pedido(s) encontrado(s) com os filtros aplicados.`
+        : `Exibindo ${orders.length} pedido(s) mais recente(s).`;
+    }
+
     if (!orders.length) {
       tbody.innerHTML = `<tr><td colspan="8" class="empty-cell">Nenhum pedido realizado ainda.</td></tr>`;
       return;
     }
 
     tbody.innerHTML = orders.map(orderRowHtml).join('');
+  }
+
+  function readOrderFilters() {
+    const form = document.getElementById('admin-orders-filters');
+    if (!form) return {};
+    const values = Object.fromEntries(new FormData(form).entries());
+    return Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value).trim()]));
   }
 
   function handleStatusChange(orderId, newStatus) {
@@ -763,7 +779,7 @@
   // ==========================================================================
   function loadAll() {
     return Promise.all([
-      DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0 }),
+      DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }),
       DataService.Customers.getAll({ limit: PAGE_SIZE, offset: 0 }),
       DataService.Orders.getAdminSummary()
     ]).then(
@@ -781,19 +797,19 @@
   }
 
   function loadOrdersOnly() {
-    return Promise.all([DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0 }), DataService.Orders.getAdminSummary()]).then(([orders, summary]) => {
+    return Promise.all([DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }), DataService.Orders.getAdminSummary()]).then(([orders, summary]) => {
       checkForNewOrders(orders);
-      const merged = new Map([...orders, ...cachedOrders].map((order) => [order.id, order]));
-      cachedOrders = Array.from(merged.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      cachedOrders = orders;
       renderDashboard(summary);
       renderOrdersTable(cachedOrders);
+      document.getElementById('admin-orders-load-more')?.classList.toggle('is-hidden', orders.length < PAGE_SIZE);
     }).catch(() => {});
   }
 
   function loadMoreOrders() {
     const button = document.getElementById('admin-orders-load-more');
     if (button) button.disabled = true;
-    return DataService.Orders.getAll({ limit: PAGE_SIZE, offset: cachedOrders.length }).then((orders) => {
+    return DataService.Orders.getAll({ limit: PAGE_SIZE, offset: cachedOrders.length, ...orderFilters }).then((orders) => {
       const known = new Set(cachedOrders.map((order) => order.id));
       cachedOrders.push(...orders.filter((order) => !known.has(order.id)));
       renderOrdersTable(cachedOrders);
@@ -888,6 +904,16 @@
     if (newProductBtn) newProductBtn.addEventListener('click', () => openProductForm(null));
 
     document.getElementById('admin-orders-load-more')?.addEventListener('click', loadMoreOrders);
+    document.getElementById('admin-orders-filters')?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      orderFilters = readOrderFilters();
+      loadOrdersOnly().catch(() => {});
+    });
+    document.getElementById('admin-orders-clear-filters')?.addEventListener('click', () => {
+      document.getElementById('admin-orders-filters')?.reset();
+      orderFilters = {};
+      loadOrdersOnly().catch(() => {});
+    });
     document.getElementById('admin-customers-load-more')?.addEventListener('click', loadMoreCustomers);
 
     const productForm = document.getElementById('form-product');

@@ -40,13 +40,15 @@ function build({ chave, nome, cidade, valor, txid }) {
   const amount = Number(valor);
 
   if (!pixKey || pixKey === 'SUA_CHAVE_PIX_AQUI' || pixKey.length > 77 || /\s/.test(pixKey)) {
-    const error = new Error('A chave PIX da loja não está configurada corretamente.');
-    error.status = 503;
+    const error = new Error('Não foi possível finalizar: configure uma chave PIX válida em Personalizar.');
+    error.status = 422;
+    error.code = 'pix_not_configured';
     throw error;
   }
   if (merchantName === '-' || merchantCity === '-') {
-    const error = new Error('Nome e cidade do beneficiário PIX precisam ser configurados.');
-    error.status = 503;
+    const error = new Error('Não foi possível finalizar: configure o nome e a cidade do beneficiário PIX em Personalizar.');
+    error.status = 422;
+    error.code = 'pix_beneficiary_incomplete';
     throw error;
   }
   if (!Number.isFinite(amount) || amount <= 0 || amount > 99999999.99) {

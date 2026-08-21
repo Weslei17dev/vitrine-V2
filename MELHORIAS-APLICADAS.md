@@ -68,8 +68,8 @@
 - Requisições repetidas de produtos e conteúdo foram eliminadas.
 - Polling passou de 3 para 15 segundos e pausa com a página oculta.
 - Tela de atualização de cadastro, alteração de senha e exclusão de conta.
-- Confirmação de maioridade, foco preso nos modais e melhorias de ARIA.
-- Cadastro deixou de coletar CPF e registra a confirmação de maioridade.
+- Foco preso nos modais e melhorias de ARIA.
+- Cadastro deixou de coletar CPF.
 - CSP no HTML, integridade SRI nos recursos do CDN e estados de foco visíveis.
 - Promessas inexistentes de cartão, frete grátis e cupom foram removidas.
 - Páginas dedicadas de privacidade, termos, trocas e pagamento PIX foram incluídas.

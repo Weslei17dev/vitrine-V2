@@ -23,15 +23,16 @@ CREATE TABLE IF NOT EXISTS users (
   city          text,
   state         text,
   zip           text,
-  adult_confirmed_at timestamptz,
+  avatar        text,
   token_version integer NOT NULL DEFAULT 0,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 0;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE users ADD COLUMN IF NOT EXISTS adult_confirmed_at timestamptz;
+ALTER TABLE users DROP COLUMN IF EXISTS adult_confirmed_at;
 -- O CPF não é necessário no fluxo atual e deixa de ser retido.
 UPDATE users SET cpf = NULL WHERE cpf IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));

@@ -49,6 +49,7 @@
     const navLinks = document.getElementById('header-nav-links');
     const myOrdersLink = document.getElementById('nav-my-orders');
     const userNameEl = document.getElementById('header-user-name');
+    const userAvatarEl = document.getElementById('header-user-avatar');
     if (!header) return;
 
     if (!state.currentUser) {
@@ -66,6 +67,12 @@
       navLinks.classList.remove('is-hidden');
       if (myOrdersLink) myOrdersLink.classList.remove('is-hidden');
       if (userNameEl) userNameEl.textContent = state.currentUser.name.split(' ')[0];
+      if (userAvatarEl) {
+        const avatar = Utils.safeImageSrc(state.currentUser.avatar || '');
+        userAvatarEl.innerHTML = avatar
+          ? `<img src="${Utils.escapeHtml(avatar)}" alt="Foto de ${Utils.escapeHtml(state.currentUser.name)}">`
+          : '<i class="fa-solid fa-user"></i>';
+      }
     } else {
       // O administrador usa um layout próprio (sidebar), então escondemos
       // o cabeçalho da loja por completo.
@@ -151,7 +158,7 @@
   function setCurrentUser(user) {
     state.currentUser = user;
     if (user) {
-      global.CartModule.migrateGuestCart(user.id);
+      global.CartModule.loadForCurrentUser();
       const products = global.ProductsModule.getCached();
       if (products.length) global.CartModule.reconcile(products);
     }
@@ -166,42 +173,20 @@
         navigate(el.dataset.nav);
       })
     );
+    document.getElementById('header-profile-btn')?.addEventListener('click', () => {
+      navigate('customer-orders');
+      requestAnimationFrame(() => {
+        const panel = document.getElementById('customer-account-panel');
+        if (!panel) return;
+        panel.open = true;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   }
 
   // --------------------------------------------------------------------------
   // Inicialização
   // --------------------------------------------------------------------------
-  function setupAgeGate() {
-    const gate = document.getElementById('age-gate');
-    const confirmButton = document.getElementById('age-confirm-btn');
-    const leaveButton = document.getElementById('age-leave-btn');
-    if (!gate) return;
-    if (localStorage.getItem('vitrine_age_confirmed') === 'yes') gate.classList.add('is-hidden');
-    else requestAnimationFrame(() => confirmButton?.focus());
-    if (confirmButton) confirmButton.addEventListener('click', () => {
-      localStorage.setItem('vitrine_age_confirmed', 'yes');
-      gate.classList.add('is-hidden');
-    });
-    if (leaveButton) leaveButton.addEventListener('click', () => {
-      if (history.length > 1) history.back();
-      else location.replace('about:blank');
-    });
-    gate.addEventListener('keydown', (event) => {
-      if (event.key !== 'Tab' || gate.classList.contains('is-hidden')) return;
-      const buttons = [confirmButton, leaveButton].filter(Boolean);
-      if (!buttons.length) return;
-      const first = buttons[0];
-      const last = buttons[buttons.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    });
-  }
-
   function setupChatHelper() {
     const helper = document.querySelector('.chat-helper');
     const toggle = document.getElementById('chat-helper-toggle');
@@ -240,7 +225,6 @@
 
   async function boot() {
     Utils.setupModalDismiss();
-    setupAgeGate();
 
     // Restaura sessão ("permanecer autenticado") antes de iniciar os módulos,
     // para que carrinho/área do cliente já carreguem os dados corretos.
@@ -256,7 +240,7 @@
     global.CustomerAreaModule.init();
     global.AdminPanelModule.init();
 
-    if (state.currentUser) global.CartModule.migrateGuestCart(state.currentUser.id);
+    if (state.currentUser) global.CartModule.loadForCurrentUser();
 
     wireHeaderNav();
     setupChatHelper();

@@ -24,7 +24,7 @@ async function cancelLockedOrder(client, order, reason) {
   const result = await client.query(
     `UPDATE orders SET status='Cancelado', status_history=$1, stock_restored=true,
        cancel_reason=$2, updated_at=now() WHERE id=$3 RETURNING *`,
-    [history, reason, order.id]
+    [JSON.stringify(history), reason, order.id]
   );
   return result.rows[0];
 }
