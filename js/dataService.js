@@ -385,6 +385,24 @@
     }
   };
 
+  const CategoryRepository = {
+    getAll(force) {
+      return apiFetch(`/api/categories${force ? `?v=${Date.now()}` : ''}`);
+    },
+    getAllAdmin() {
+      return apiFetch('/api/categories/admin/all');
+    },
+    create(payload) {
+      return apiFetch('/api/categories', { method: 'POST', body: JSON.stringify(payload) });
+    },
+    update(id, payload) {
+      return apiFetch(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
+    },
+    remove(id) {
+      return apiFetch(`/api/categories/${id}`, { method: 'DELETE' });
+    }
+  };
+
   const AuditRepository = {
     getAll() {
       return apiFetch('/api/audit');
@@ -413,6 +431,7 @@
   global.DataService = {
     Auth: AuthRepository,
     Products: ProductRepository,
+    Categories: CategoryRepository,
     Cart: CartRepository,
     Orders: OrderRepository,
     Customers: CustomerRepository,

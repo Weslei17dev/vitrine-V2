@@ -42,6 +42,7 @@
         name: String(item.name || '').slice(0, 160),
         price,
         icon: String(item.icon || '🛍️').slice(0, 8),
+        image: Utils.safeImageSrc(item.image || ''),
         stock: Number.isInteger(parsedStock) && parsedStock >= 0 ? parsedStock : null,
         qty: Math.min(qty, Number.isInteger(parsedStock) && parsedStock > 0 ? parsedStock : qty)
       };
@@ -75,6 +76,7 @@
         name: product.name,
         price: product.price,
         icon: product.icon,
+        image: Utils.safeImageSrc(product.image || ''),
         stock,
         qty: 1
       });
@@ -130,6 +132,7 @@
         name: product.name,
         price: Number(product.price),
         icon: product.icon,
+        image: Utils.safeImageSrc(product.image || ''),
         stock,
         qty: stock > 0 ? Math.min(item.qty, stock, 99) : 1
       };
@@ -151,9 +154,13 @@
 
   function cartItemRowHtml(item) {
     const maximum = maxQuantity(item);
+    const image = Utils.safeImageSrc(item.image || '');
+    const visual = image
+      ? `<img src="${Utils.escapeHtml(image)}" alt="${Utils.escapeHtml(item.name)}">`
+      : `<span>${Utils.escapeHtml(item.icon || '🛍️')}</span>`;
     return `
       <div class="cart-item" data-id="${Utils.escapeHtml(item.productId)}">
-        <div class="cart-item__icon">${Utils.escapeHtml(item.icon || '🛍️')}</div>
+        <div class="cart-item__image">${visual}</div>
         <div class="cart-item__info">
           <strong>${Utils.escapeHtml(item.name)}</strong>
           <span>${Utils.formatCurrency(item.price)} / un.</span>

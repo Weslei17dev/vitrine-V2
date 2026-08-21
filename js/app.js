@@ -18,6 +18,7 @@
     login: 'view-login',
     register: 'view-register',
     store: 'view-store',
+    catalog: 'view-catalog',
     blog: 'view-blog',
     'blog-article': 'view-blog-article',
     legal: 'view-legal',
@@ -31,6 +32,7 @@
     login: 'Entrar — Brincar de Desejo',
     register: 'Criar conta — Brincar de Desejo',
     store: 'Brincar de Desejo — Bem-estar íntimo com discrição',
+    catalog: 'Catálogo completo — Brincar de Desejo',
     blog: 'Blog — Brincar de Desejo',
     'blog-article': 'Artigo — Brincar de Desejo',
     legal: 'Privacidade e termos — Brincar de Desejo',
@@ -99,7 +101,7 @@
     if (view === 'store') {
       if (state.currentUser && state.currentUser.role === 'admin') view = 'admin';
     }
-    if (['product-detail', 'blog', 'blog-article', 'legal'].includes(view)) {
+    if (['catalog', 'product-detail', 'blog', 'blog-article', 'legal'].includes(view)) {
       if (state.currentUser && state.currentUser.role === 'admin') view = 'admin';
     }
     if (view === 'customer-orders') {
@@ -139,6 +141,7 @@
       if (global.SiteContentModule) global.SiteContentModule.render();
       if (global.BlogModule) global.BlogModule.render();
     }
+    if (view === 'catalog') global.ProductsModule.loadAndRender();
     if (view === 'blog') {
       if (global.BlogModule) global.BlogModule.render();
     }

@@ -256,6 +256,9 @@
       </div>
       <div id="category-filters" class="chip-list"></div>
       <div id="product-grid" class="product-grid"></div>
+      <div id="home-catalog-more" class="catalog-more is-hidden">
+        <button type="button" class="btn btn--primary" data-nav="catalog"><i class="fa-solid fa-store"></i> Ver todos os produtos</button>
+      </div>
     </section>
 
     <section class="home-section how-section" aria-labelledby="how-title">
@@ -374,6 +377,22 @@
       <p>Brincar de Desejo — Todos os direitos reservados.</p>
     </div>
   </footer>
+</section>
+
+<!-- ============================================================
+     VIEW: CATÁLOGO COMPLETO
+============================================================= -->
+<section id="view-catalog" class="view content-view">
+  <div class="page-container catalog-page">
+    <button class="pd-back-link" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Voltar para a loja</button>
+    <header class="catalog-page__header">
+      <div><span class="section-eyebrow">Todos os produtos</span><h1>Catálogo completo</h1><p>Pesquise e filtre para encontrar exatamente o que procura.</p></div>
+      <div class="store-hero__search"><i class="fa-solid fa-magnifying-glass"></i><input id="catalog-page-search" type="search" placeholder="Buscar produto..." aria-label="Buscar no catálogo completo"></div>
+    </header>
+    <div id="catalog-page-category-filters" class="chip-list"></div>
+    <div id="catalog-page-results" class="catalog-page__results"></div>
+    <div id="catalog-page-grid" class="product-grid product-grid--catalog"></div>
+  </div>
 </section>
 
 <section id="view-blog" class="view content-view">
@@ -573,6 +592,9 @@
         </button>
         <button class="admin-nav__item" data-admin-tab="produtos">
           <i class="fa-solid fa-boxes-stacked"></i> Produtos
+        </button>
+        <button class="admin-nav__item" data-admin-tab="categorias">
+          <i class="fa-solid fa-layer-group"></i> Categorias
         </button>
         <button class="admin-nav__item" data-admin-tab="avaliacoes">
           <i class="fa-solid fa-star-half-stroke"></i> Avaliações
@@ -869,6 +891,14 @@
               <tbody id="admin-products-tbody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+
+      <!-- ---------- CATEGORIAS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="categorias">
+        <div class="panel-card">
+          <div class="panel-card__header"><div><h2><i class="fa-solid fa-layer-group"></i> Categorias da vitrine</h2><p class="theme-hint">Cadastre, ordene e escolha a imagem exibida nas barras de categoria.</p></div><button id="new-category-btn" type="button" class="btn btn--primary btn--sm"><i class="fa-solid fa-plus"></i> Nova categoria</button></div>
+          <div id="admin-categories-grid" class="admin-categories-grid"></div>
         </div>
       </div>
 
@@ -1243,6 +1273,25 @@
 <!-- ============================================================
      MODAL: FORMULÁRIO DE PRODUTO (admin — criar/editar)
 ============================================================= -->
+<div id="modal-category-form" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="category-form-title">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog modal__dialog--wide">
+    <div class="modal__header"><h2 id="category-form-title"><i class="fa-solid fa-layer-group"></i> Nova categoria</h2><button class="icon-btn" data-close-modal aria-label="Fechar"><i class="fa-solid fa-xmark"></i></button></div>
+    <form id="form-category">
+      <div class="modal__body">
+        <div class="form-grid">
+          <div class="form-field form-field--span2"><label for="category-name">Nome da categoria</label><input id="category-name" name="name" required maxlength="80"></div>
+          <div class="form-field"><label for="category-color">Cor de destaque</label><input id="category-color" name="color" type="color" value="#D99163"></div>
+          <div class="form-field"><label for="category-order">Ordem de exibição</label><input id="category-order" name="sortOrder" type="number" min="0" step="1" value="0"></div>
+          <div class="form-field form-field--span2"><label>Imagem da categoria</label><div class="image-upload"><div id="category-image-preview" class="image-upload__preview"><i class="fa-solid fa-image"></i></div><div class="image-upload__actions"><label class="btn btn--outline btn--sm image-upload__btn"><i class="fa-solid fa-upload"></i> Enviar imagem<input id="category-image-input" type="file" accept="image/jpeg,image/png,image/webp" class="image-upload__input"></label><button id="category-image-remove" type="button" class="btn btn--ghost btn--sm is-hidden"><i class="fa-solid fa-trash"></i> Remover</button></div></div></div>
+          <div class="form-field form-field--span2 form-field--checkbox"><label><input name="active" type="checkbox" checked> Categoria ativa na loja</label></div>
+        </div>
+      </div>
+      <div class="modal__footer"><button type="button" class="btn btn--outline" data-close-modal>Cancelar</button><button type="submit" class="btn btn--primary"><i class="fa-solid fa-check"></i> Salvar categoria</button></div>
+    </form>
+  </div>
+</div>
+
 <div id="modal-product-form" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="product-form-title">
   <div class="modal__backdrop" data-close-modal></div>
   <div class="modal__dialog modal__dialog--product">
@@ -1276,7 +1325,8 @@
 
           <div class="form-field">
             <label for="prod-category">Categoria</label>
-            <input id="prod-category" name="category" type="text" placeholder="Ex: Eletrônicos" required>
+            <input id="prod-category" name="category" type="text" list="product-category-options" placeholder="Selecione uma categoria" required>
+            <datalist id="product-category-options"></datalist>
           </div>
 
           <div class="form-field form-field--span2">

@@ -132,6 +132,7 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', requireAdmin, async (req, res, next) => {
   try {
     const p = validateProduct(req.body || {});
+    await pool.query('INSERT INTO categories (name,color) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [p.category, p.color]);
     const result = await pool.query(
       `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -151,6 +152,7 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
   try {
     const id = V.uuid(req.params.id, 'Produto');
     const p = validateProduct(req.body || {});
+    await pool.query('INSERT INTO categories (name,color) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [p.category, p.color]);
     const expectedUpdatedAt = V.timestamp(req.body && req.body.updatedAt);
     const result = await pool.query(
       `UPDATE products SET name=$1, description=$2, price=$3, compare_at_price=$4, category=$5, icon=$6, color=$7,

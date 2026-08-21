@@ -78,6 +78,23 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 CREATE INDEX IF NOT EXISTS idx_products_active_category ON products(active, category);
 
+-- Categorias editáveis exibidas na vitrine.
+CREATE TABLE IF NOT EXISTS categories (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text NOT NULL UNIQUE,
+  image      text,
+  color      text NOT NULL DEFAULT '#D99163',
+  active     boolean NOT NULL DEFAULT true,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_categories_active_order ON categories(active, sort_order, name);
+INSERT INTO categories (name, color, sort_order)
+SELECT category, MIN(color), row_number() OVER (ORDER BY MIN(created_at))
+FROM products WHERE category IS NOT NULL AND btrim(category) <> '' GROUP BY category
+ON CONFLICT (name) DO NOTHING;
+
 -- Sequência usada para gerar o número de pedido (ex: 000123).
 CREATE SEQUENCE IF NOT EXISTS order_number_seq START 1;
 

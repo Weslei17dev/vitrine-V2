@@ -21,6 +21,8 @@
   let cachedCustomers = [];
   let currentProductImage = null; // dataURL da foto enviada no formulário de produto
   let currentProductGallery = []; // dataURLs das fotos adicionais (galeria da página do produto)
+  let editingCategoryId = null;
+  let currentCategoryImage = null;
 
   // ==========================================================================
   // DASHBOARD
@@ -356,6 +358,7 @@
       editingProductId = null;
       editingProductUpdatedAt = null;
       loadProducts();
+      loadCategories();
       if (global.ProductsModule) global.ProductsModule.loadAndRender(true);
     }).catch((err) => Utils.showToast(err.message, 'error'))
       .finally(() => { if (submitBtn) submitBtn.disabled = false; });
@@ -372,6 +375,69 @@
 
   function loadProducts() {
     return DataService.Products.getAllAdmin().then(renderProductsTable).catch((err) => Utils.showToast(err.message, 'error'));
+  }
+
+  // ==========================================================================
+  // CATEGORIAS EDITÁVEIS
+  // ==========================================================================
+  function categoryCardHtml(category) {
+    const image = Utils.safeImageSrc(category.image || '');
+    return `<article class="admin-category-card" data-id="${category.id}">
+      <div class="admin-category-card__image" style="--category-color:${Utils.safeColor(category.color)}">${image ? `<img src="${Utils.escapeHtml(image)}" alt="">` : '<i class="fa-solid fa-layer-group"></i>'}</div>
+      <div class="admin-category-card__body"><strong>${Utils.escapeHtml(category.name)}</strong><span>${category.productCount || 0} produto(s) · ordem ${category.sortOrder || 0}</span><span class="status-pill ${category.active ? 'status-pill--on' : 'status-pill--off'}">${category.active ? 'Ativa' : 'Inativa'}</span></div>
+      <div class="admin-category-card__actions"><button type="button" class="btn btn--outline btn--sm" data-action="edit-category"><i class="fa-solid fa-pen"></i> Editar</button><button type="button" class="btn-icon btn-icon--danger" data-action="delete-category" aria-label="Excluir categoria"><i class="fa-solid fa-trash"></i></button></div>
+    </article>`;
+  }
+
+  function renderCategories(categories) {
+    const root = document.getElementById('admin-categories-grid');
+    if (root) root.innerHTML = categories.length ? categories.map(categoryCardHtml).join('') : '<div class="empty-state"><p>Nenhuma categoria cadastrada.</p></div>';
+    const options = document.getElementById('product-category-options');
+    if (options) options.innerHTML = categories.filter((category) => category.active).map((category) => `<option value="${Utils.escapeHtml(category.name)}"></option>`).join('');
+  }
+
+  function loadCategories() {
+    return DataService.Categories.getAllAdmin().then(renderCategories).catch((err) => Utils.showToast(err.message, 'error'));
+  }
+
+  function updateCategoryImagePreview() {
+    const preview = document.getElementById('category-image-preview');
+    const remove = document.getElementById('category-image-remove');
+    if (!preview) return;
+    const image = Utils.safeImageSrc(currentCategoryImage || '');
+    preview.innerHTML = image ? `<img src="${Utils.escapeHtml(image)}" alt="">` : '<i class="fa-solid fa-image"></i>';
+    remove?.classList.toggle('is-hidden', !image);
+  }
+
+  function openCategoryForm(category) {
+    editingCategoryId = category ? category.id : null;
+    currentCategoryImage = category ? category.image : null;
+    const form = document.getElementById('form-category');
+    form.reset();
+    document.getElementById('category-form-title').textContent = category ? 'Editar categoria' : 'Nova categoria';
+    if (category) {
+      form.elements.name.value = category.name;
+      form.elements.color.value = category.color || '#D99163';
+      form.elements.sortOrder.value = category.sortOrder || 0;
+      form.elements.active.checked = category.active !== false;
+    }
+    updateCategoryImagePreview();
+    Utils.openModal('modal-category-form');
+  }
+
+  function saveCategory(event) {
+    event.preventDefault();
+    const form = event.target;
+    const payload = { name: form.elements.name.value.trim(), color: form.elements.color.value, sortOrder: Number(form.elements.sortOrder.value) || 0, active: form.elements.active.checked, image: currentCategoryImage || null };
+    const action = editingCategoryId ? DataService.Categories.update(editingCategoryId, payload) : DataService.Categories.create(payload);
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    action.then(() => {
+      Utils.closeModal('modal-category-form');
+      Utils.showToast(editingCategoryId ? 'Categoria atualizada.' : 'Categoria criada.', 'success');
+      editingCategoryId = null;
+      return Promise.all([loadCategories(), loadProducts(), global.ProductsModule.loadAndRender(true)]);
+    }).catch((err) => Utils.showToast(err.message, 'error')).finally(() => { if (button) button.disabled = false; });
   }
 
   // ==========================================================================
@@ -726,7 +792,7 @@
       btn.classList.toggle('is-active', btn.dataset.adminTab === tabName);
     });
     const titles = {
-      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos',
+      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', categorias: 'Categorias',
       relatorios: 'Relatórios', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
     };
     const title = document.getElementById('admin-topbar-title');
@@ -766,7 +832,7 @@
     }
 
     orders.forEach((order) => {
-      if (!knownOrderIds.has(order.id)) {
+      if (!knownOrderIds.has(order.id) && !order.seenByAdmin) {
         knownOrderIds.add(order.id);
         notifyNewOrder(order);
         DataService.Orders.markSeenByAdmin(order.id).catch(() => {});
@@ -786,7 +852,7 @@
       ([orders, customers, summary]) => {
         cachedOrders = orders;
         cachedCustomers = customers;
-        checkForNewOrders(orders);
+        if (!Object.values(orderFilters).some((value) => value !== '' && value != null)) checkForNewOrders(orders);
         renderDashboard(summary);
         renderCustomersTable(cachedCustomers);
         renderOrdersTable(cachedOrders);
@@ -798,7 +864,7 @@
 
   function loadOrdersOnly() {
     return Promise.all([DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }), DataService.Orders.getAdminSummary()]).then(([orders, summary]) => {
-      checkForNewOrders(orders);
+      if (!Object.values(orderFilters).some((value) => value !== '' && value != null)) checkForNewOrders(orders);
       cachedOrders = orders;
       renderDashboard(summary);
       renderOrdersTable(cachedOrders);
@@ -829,7 +895,7 @@
   }
 
   function enter() {
-    return Promise.all([loadAll(), loadProducts(), loadSiteContentForm(), loadReviews(), loadAudit()]);
+    return Promise.all([loadAll(), loadProducts(), loadCategories(), loadSiteContentForm(), loadReviews(), loadAudit()]);
   }
 
   function startPolling() {
@@ -902,6 +968,33 @@
 
     const newProductBtn = document.getElementById('new-product-btn');
     if (newProductBtn) newProductBtn.addEventListener('click', () => openProductForm(null));
+
+    document.getElementById('new-category-btn')?.addEventListener('click', () => openCategoryForm(null));
+    document.getElementById('form-category')?.addEventListener('submit', saveCategory);
+    document.getElementById('category-image-input')?.addEventListener('change', (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      Utils.compressImageFile(file, { maxWidth: 800, maxHeight: 800, quality: .82 }).then((image) => {
+        currentCategoryImage = image;
+        updateCategoryImagePreview();
+      }).catch((err) => Utils.showToast(err.message, 'error'));
+      event.target.value = '';
+    });
+    document.getElementById('category-image-remove')?.addEventListener('click', () => { currentCategoryImage = null; updateCategoryImagePreview(); });
+    document.getElementById('admin-categories-grid')?.addEventListener('click', (event) => {
+      const card = event.target.closest('[data-id]');
+      if (!card) return;
+      if (event.target.closest('[data-action="edit-category"]')) {
+        DataService.Categories.getAllAdmin().then((categories) => openCategoryForm(categories.find((category) => category.id === card.dataset.id)));
+      }
+      if (event.target.closest('[data-action="delete-category"]')) {
+        if (!confirm('Excluir esta categoria? Ela só poderá ser excluída se não possuir produtos.')) return;
+        DataService.Categories.remove(card.dataset.id).then(() => {
+          Utils.showToast('Categoria excluída.', 'info');
+          return Promise.all([loadCategories(), global.ProductsModule.loadAndRender(true)]);
+        }).catch((err) => Utils.showToast(err.message, 'error'));
+      }
+    });
 
     document.getElementById('admin-orders-load-more')?.addEventListener('click', loadMoreOrders);
     document.getElementById('admin-orders-filters')?.addEventListener('submit', (event) => {

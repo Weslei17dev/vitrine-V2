@@ -10,8 +10,10 @@
 
   const state = {
     all: [],
+    categories: [],
     category: 'Todos',
-    search: ''
+    search: '',
+    catalogSearch: ''
   };
   let loadPromise = null;
 
@@ -28,7 +30,10 @@
     const container = document.getElementById('category-filters');
     if (!container) return;
 
-    const categories = ['Todos', ...new Set(state.all.map((p) => p.category))];
+    const categoryNames = state.categories.length
+      ? state.categories.filter((category) => category.active !== false).map((category) => category.name)
+      : [...new Set(state.all.map((p) => p.category))];
+    const categories = ['Todos', ...categoryNames];
     container.innerHTML = categories
       .map(
         (cat) => `
@@ -47,6 +52,7 @@
     );
 
     renderCategoryNavigation(categories.slice(1));
+    renderCatalogPageFilters(categories);
   }
 
   const CATEGORY_ICONS = [
@@ -72,10 +78,13 @@
     }
     root.innerHTML = list.map((category, index) => {
       const product = state.all.find((item) => item.category === category);
-      const color = Utils.safeColor(product && product.color);
+      const configured = state.categories.find((item) => item.name === category);
+      const color = Utils.safeColor((configured && configured.color) || (product && product.color));
+      const image = Utils.safeImageSrc(configured && configured.image);
+      const visual = image ? `<img src="${Utils.escapeHtml(image)}" alt="" loading="lazy">` : Utils.escapeHtml(categoryIcon(category, state.all));
       return `
         <button type="button" class="category-card${state.category === category ? ' is-active' : ''}" data-category-index="${index}" style="--category-color:${color}">
-          <span class="category-card__visual" aria-hidden="true">${Utils.escapeHtml(categoryIcon(category, state.all))}</span>
+          <span class="category-card__visual" aria-hidden="true">${visual}</span>
           <span>${Utils.escapeHtml(category)}</span>
         </button>`;
     }).join('');
@@ -84,7 +93,8 @@
         state.category = list[parseInt(button.dataset.categoryIndex, 10)];
         renderCategoryFilters();
         renderGrid();
-        document.getElementById('product-grid-anchor')?.scrollIntoView({ block: 'start' });
+        renderCatalogPage();
+        global.App.navigate('catalog');
       });
     });
   }
@@ -199,6 +209,8 @@
     const grid = document.getElementById('product-grid');
     if (!grid) return;
     const list = getFiltered();
+    const more = document.getElementById('home-catalog-more');
+    if (more) more.classList.toggle('is-hidden', list.length <= 8);
 
     if (!list.length) {
       grid.innerHTML = `
@@ -209,7 +221,35 @@
       return;
     }
 
-    grid.innerHTML = list.map(productCardHtml).join('');
+    grid.innerHTML = list.slice(0, 8).map(productCardHtml).join('');
+  }
+
+  function renderCatalogPageFilters(categories) {
+    const container = document.getElementById('catalog-page-category-filters');
+    if (!container) return;
+    container.innerHTML = categories.map((category) => `
+      <button class="chip ${category === state.category ? 'chip--active' : ''}" data-catalog-category="${Utils.escapeHtml(category)}">${Utils.escapeHtml(category)}</button>`).join('');
+    container.querySelectorAll('[data-catalog-category]').forEach((button) => button.addEventListener('click', () => {
+      state.category = button.dataset.catalogCategory;
+      renderCategoryFilters();
+      renderCatalogPage();
+    }));
+  }
+
+  function renderCatalogPage() {
+    const grid = document.getElementById('catalog-page-grid');
+    if (!grid) return;
+    const term = state.catalogSearch.toLowerCase();
+    const list = state.all.filter((product) => {
+      const categoryMatches = state.category === 'Todos' || product.category === state.category;
+      const textMatches = `${product.name} ${product.description || ''} ${product.category || ''}`.toLowerCase().includes(term);
+      return product.active !== false && categoryMatches && textMatches;
+    });
+    const result = document.getElementById('catalog-page-results');
+    if (result) result.textContent = `${list.length} produto(s) encontrado(s)`;
+    grid.innerHTML = list.length
+      ? list.map(productCardHtml).join('')
+      : '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>Nenhum produto encontrado.</p></div>';
   }
 
   function handleAddToCart(productId) {
@@ -240,6 +280,10 @@
       state.search = e.target.value;
       renderGrid();
     });
+    document.getElementById('catalog-page-search')?.addEventListener('input', (event) => {
+      state.catalogSearch = event.target.value;
+      renderCatalogPage();
+    });
   }
 
   function wireGridClicks() {
@@ -254,16 +298,30 @@
       const card = e.target.closest('.product-card');
       if (card && global.ProductDetailModule) global.ProductDetailModule.show(card.dataset.id);
     });
+    document.getElementById('catalog-page-grid')?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action="add-to-cart"]');
+      if (button) {
+        handleAddToCart(button.dataset.id);
+        return;
+      }
+      const card = event.target.closest('.product-card');
+      if (card && global.ProductDetailModule) global.ProductDetailModule.show(card.dataset.id);
+    });
   }
 
   function loadAndRender(force) {
     if (loadPromise && !force) return loadPromise;
-    loadPromise = DataService.Products.getAll(Boolean(force)).then((products) => {
+    loadPromise = Promise.all([
+      DataService.Products.getAll(Boolean(force)),
+      DataService.Categories.getAll(Boolean(force)).catch(() => [])
+    ]).then(([products, categories]) => {
       state.all = products;
+      state.categories = categories;
       if (global.CartModule) global.CartModule.reconcile(products);
       renderCategoryFilters();
       renderGrid();
       renderFeatured();
+      renderCatalogPage();
       return products;
     }).catch((err) => {
       loadPromise = null;
