@@ -32,5 +32,7 @@ module.exports = {
   jwtAudience: process.env.JWT_AUDIENCE || 'brincar-de-desejo-web',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '2h',
   port: Number(process.env.PORT) || 3000,
-  maxJsonSize: process.env.MAX_JSON_SIZE || '3mb'
+  maxJsonSize: process.env.MAX_JSON_SIZE || '3mb',
+  orderPaymentTtlMinutes: Math.max(10, Math.min(1440, Number(process.env.ORDER_PAYMENT_TTL_MINUTES) || 30)),
+  maxOpenOrdersPerUser: Math.max(1, Math.min(10, Number(process.env.MAX_OPEN_ORDERS_PER_USER) || 3))
 };

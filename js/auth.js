@@ -2,7 +2,7 @@
    auth.js
    ----------------------------------------------------------------------------
    Responsável por: login (admin e cliente), cadastro de cliente e
-   manutenção da sessão ("permanecer autenticado" via localStorage).
+   manutenção da sessão temporária via sessionStorage.
    ============================================================================ */
 
 (function (global) {
@@ -97,6 +97,12 @@
       valid = false;
     }
 
+    const adultConfirmation = form.elements.adultConfirmed;
+    if (!adultConfirmation.checked) {
+      showFieldError(adultConfirmation, 'Confirme a maioridade e a leitura dos termos.');
+      valid = false;
+    }
+
     return valid;
   }
 
@@ -113,14 +119,14 @@
     const submitBtn = form.querySelector('button[type="submit"]');
     const payload = {
       name: form.elements.name.value,
-      cpf: form.elements.cpf.value,
       phone: form.elements.phone.value,
       email: form.elements.email.value,
       password: form.elements.password.value,
       address: form.elements.address.value,
       city: form.elements.city.value,
       state: form.elements.state.value,
-      zip: form.elements.zip.value
+      zip: form.elements.zip.value,
+      adultConfirmed: form.elements.adultConfirmed.checked
     };
 
     setButtonLoading(submitBtn, true, 'Criando conta...');
@@ -182,10 +188,8 @@
     );
 
     // Máscaras simples nos campos de cadastro
-    const cpfInput = document.querySelector('#form-register [name="cpf"]');
     const phoneInput = document.querySelector('#form-register [name="phone"]');
     const cepInput = document.querySelector('#form-register [name="zip"]');
-    if (cpfInput) cpfInput.addEventListener('input', (e) => (e.target.value = Utils.maskCpf(e.target.value)));
     if (phoneInput) phoneInput.addEventListener('input', (e) => (e.target.value = Utils.maskPhone(e.target.value)));
     if (cepInput) cepInput.addEventListener('input', (e) => (e.target.value = Utils.maskCep(e.target.value)));
   }

@@ -24,3 +24,14 @@ test('recusa produto inativo e estoque insuficiente', () => {
     [{ id: 'p1', name: 'Produto', price: 10, stock: 2, active: true }]
   ), /Estoque insuficiente/);
 });
+
+test('inclui o frete no total sem confiar em valores enviados pelo cliente', () => {
+  const result = calculateOrder(
+    [{ productId: 'p1', qty: 2, price: 0.01 }],
+    [{ id: 'p1', name: 'Produto', price: 10, stock: 5, active: true }],
+    1590
+  );
+  assert.equal(result.subtotalCents, 2000);
+  assert.equal(result.shippingCents, 1590);
+  assert.equal(result.totalCents, 3590);
+});

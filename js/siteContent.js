@@ -2,10 +2,10 @@
    siteContent.js
    ----------------------------------------------------------------------------
    Lê o conteúdo personalizável do site (DataService.SiteContent) e aplica em
-   todos os elementos editáveis da loja: banner principal, carrossel de
-   promoções, oferta relâmpago, quem somos, destaque de produto, FAQ e
-   rodapé. É chamado sempre que a loja é exibida, então qualquer alteração
-   feita pelo admin na aba "Personalizar" aparece assim que a página
+   todos os elementos editáveis da loja: banner integrado, seleção especial,
+   destaque de produto, FAQ e rodapé. É chamado sempre que a loja é exibida,
+   então qualquer alteração feita pelo admin na aba "Personalizar" aparece
+   assim que a página
    recarrega ou o visitante navega até a loja.
    ============================================================================ */
 
@@ -18,13 +18,6 @@
   function setText(id, value) {
     const el = document.getElementById(id);
     if (el) el.textContent = value;
-  }
-
-  // Converte quebras de linha em <br>, escapando o resto do texto.
-  function setTextWithBreaks(id, value) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.innerHTML = Utils.escapeHtml(value || '').replace(/\n/g, '<br>');
   }
 
   function setImage(id, src, alt) {
@@ -56,22 +49,25 @@
     Object.keys(THEME_VAR_MAP).forEach((key) => {
       if (theme[key]) root.setProperty(THEME_VAR_MAP[key], theme[key]);
     });
+    root.setProperty('--color-on-primary', readableTextColor(theme.primary));
+    root.setProperty('--color-on-accent', readableTextColor(theme.accent));
   }
 
-  // --------------------------------------------------------------------------
-  // Banner principal
-  // --------------------------------------------------------------------------
-  function applyHero(hero) {
-    setText('hero-eyebrow', hero.eyebrow);
-    setTextWithBreaks('hero-title', hero.title);
-    setText('hero-subtitle', hero.subtitle);
-    setText('hero-cta-text', hero.ctaText);
+  function readableTextColor(hex) {
+    const value = String(hex || '').replace('#', '');
+    if (!/^[0-9a-f]{6}$/i.test(value)) return '#FDFCFA';
+    const channels = [0, 2, 4].map((index) => parseInt(value.slice(index, index + 2), 16) / 255)
+      .map((channel) => channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
+    const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    const contrastLight = 1.05 / (luminance + 0.05);
+    const contrastDark = (luminance + 0.05) / 0.0603;
+    return contrastLight >= contrastDark ? '#FDFCFA' : '#1A1A1A';
   }
 
   // --------------------------------------------------------------------------
   // Carrossel de promoções
   // --------------------------------------------------------------------------
-  function applyCarousel(slides) {
+  function applyCarousel(slides, hero) {
     const root = document.getElementById('promo-carousel');
     if (!root) return;
 
@@ -86,36 +82,75 @@
       return;
     }
 
+    const fallback = hero || {};
+    const targetMap = {
+      catalog: '#product-grid-anchor',
+      categories: '#category-navigation-section',
+      selection: '#selection-special'
+    };
     root.innerHTML =
       list
         .map(
           (slide, i) => `
-        <div class="promo-carousel__slide${i === 0 ? ' is-active' : ''}">
-          <img src="${Utils.escapeHtml(Utils.safeImageSrc(slide.image))}" alt="${Utils.escapeHtml(slide.alt || '')}" loading="lazy">
+        <div class="promo-carousel__slide${i === 0 ? ' is-active' : ''}" aria-hidden="${i === 0 ? 'false' : 'true'}"${i === 0 ? '' : ' inert'}>
+          <img src="${Utils.escapeHtml(Utils.safeImageSrc(slide.image))}" alt="${Utils.escapeHtml(slide.alt || '')}" loading="${i === 0 ? 'eager' : 'lazy'}"${i === 0 ? ' fetchpriority="high"' : ''}>
+          <div class="promo-carousel__content">
+            <span class="promo-carousel__eyebrow">${Utils.escapeHtml(slide.eyebrow || fallback.eyebrow || '')}</span>
+            <h1>${Utils.escapeHtml(slide.title || fallback.title || '').replace(/\n/g, '<br>')}</h1>
+            <p>${Utils.escapeHtml(slide.subtitle || fallback.subtitle || '')}</p>
+            <a href="${targetMap[slide.ctaTarget] || targetMap.catalog}" class="btn btn--accent btn--lg" tabindex="${i === 0 ? '0' : '-1'}"><i class="fa-solid fa-arrow-right"></i> ${Utils.escapeHtml(slide.ctaText || fallback.ctaText || 'Ver catálogo')}</a>
+          </div>
         </div>`
         )
         .join('') +
       (list.length > 1
-        ? `<div class="promo-carousel__dots">
-            ${list.map((_, i) => `<button class="${i === 0 ? 'is-active' : ''}" data-slide="${i}" aria-label="Slide ${i + 1}"></button>`).join('')}
-          </div>`
+        ? `<button type="button" class="promo-carousel__arrow promo-carousel__arrow--prev" data-carousel-direction="prev" aria-label="Banner anterior"><i class="fa-solid fa-chevron-left"></i></button>
+           <button type="button" class="promo-carousel__arrow promo-carousel__arrow--next" data-carousel-direction="next" aria-label="Próximo banner"><i class="fa-solid fa-chevron-right"></i></button>
+           <div class="promo-carousel__dots">
+            ${list.map((_, i) => `<button type="button" class="${i === 0 ? 'is-active' : ''}" data-slide="${i}" aria-label="Mostrar banner ${i + 1}" aria-current="${i === 0 ? 'true' : 'false'}"></button>`).join('')}
+           </div>
+           <button type="button" class="promo-carousel__toggle" data-carousel-toggle aria-label="Pausar rotação dos banners"><i class="fa-solid fa-pause"></i></button>`
         : '');
 
     if (list.length <= 1) return;
 
     const slideEls = Array.from(root.querySelectorAll('.promo-carousel__slide'));
     const dotEls = Array.from(root.querySelectorAll('.promo-carousel__dots button'));
+    const autoplayToggle = root.querySelector('[data-carousel-toggle]');
+    const prefersReducedMotion = Boolean(global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    let autoplayPaused = prefersReducedMotion;
     let index = 0;
 
     function show(i) {
       index = (i + slideEls.length) % slideEls.length;
-      slideEls.forEach((s, n) => s.classList.toggle('is-active', n === index));
-      dotEls.forEach((d, n) => d.classList.toggle('is-active', n === index));
+      slideEls.forEach((s, n) => {
+        s.classList.toggle('is-active', n === index);
+        s.setAttribute('aria-hidden', String(n !== index));
+        s.toggleAttribute('inert', n !== index);
+        const link = s.querySelector('a');
+        if (link) link.tabIndex = n === index ? 0 : -1;
+      });
+      dotEls.forEach((d, n) => {
+        d.classList.toggle('is-active', n === index);
+        d.setAttribute('aria-current', String(n === index));
+      });
+    }
+
+    function stopAutoplay() {
+      if (carouselHandle) clearInterval(carouselHandle);
+      carouselHandle = null;
     }
 
     function startAutoplay() {
-      if (carouselHandle) clearInterval(carouselHandle);
+      stopAutoplay();
+      if (autoplayPaused) return;
       carouselHandle = setInterval(() => show(index + 1), 4500);
+    }
+
+    function updateAutoplayControl() {
+      if (!autoplayToggle) return;
+      autoplayToggle.setAttribute('aria-label', autoplayPaused ? 'Retomar rotação dos banners' : 'Pausar rotação dos banners');
+      autoplayToggle.innerHTML = `<i class="fa-solid fa-${autoplayPaused ? 'play' : 'pause'}"></i>`;
     }
 
     dotEls.forEach((dot) => {
@@ -125,6 +160,26 @@
       });
     });
 
+    root.querySelector('[data-carousel-direction="prev"]')?.addEventListener('click', () => {
+      show(index - 1);
+      startAutoplay();
+    });
+    root.querySelector('[data-carousel-direction="next"]')?.addEventListener('click', () => {
+      show(index + 1);
+      startAutoplay();
+    });
+    autoplayToggle?.addEventListener('click', () => {
+      autoplayPaused = !autoplayPaused;
+      if (autoplayPaused) stopAutoplay();
+      else startAutoplay();
+      updateAutoplayControl();
+    });
+    root.addEventListener('mouseenter', stopAutoplay);
+    root.addEventListener('mouseleave', startAutoplay);
+    root.addEventListener('focusin', stopAutoplay);
+    root.addEventListener('focusout', startAutoplay);
+
+    updateAutoplayControl();
     startAutoplay();
   }
 
@@ -135,25 +190,6 @@
     setText('flash-sale-tag', flashSale.tag);
     setText('flash-sale-title', flashSale.title);
     setText('flash-sale-description', flashSale.description);
-  }
-
-  // --------------------------------------------------------------------------
-  // Quem somos
-  // --------------------------------------------------------------------------
-  function applyAbout(about) {
-    setImage('about-image', about.image, 'Quem somos — Brincar de Desejo');
-    setText('about-eyebrow', about.eyebrow);
-    setText('about-title', about.title);
-    setText('about-paragraph-1', about.paragraph1);
-    setText('about-paragraph-2', about.paragraph2);
-
-    const bulletsEl = document.getElementById('about-bullets');
-    if (bulletsEl) {
-      const bullets = Array.isArray(about.bullets) ? about.bullets : [];
-      bulletsEl.innerHTML = bullets
-        .map((b) => `<li><i class="fa-solid fa-check"></i> ${Utils.escapeHtml(b)}</li>`)
-        .join('');
-    }
   }
 
   // --------------------------------------------------------------------------
@@ -211,6 +247,25 @@
     setText('footer-email', footer.email);
     setText('footer-hours-1', footer.hours1);
     setText('footer-hours-2', footer.hours2);
+
+    const phoneDigits = String(footer.phone || '').replace(/\D/g, '');
+    const phoneLink = document.getElementById('footer-phone-link');
+    const emailLink = document.getElementById('footer-email-link');
+    const emailIconLink = document.getElementById('footer-email-icon-link');
+    const phoneRow = document.getElementById('footer-phone-row');
+    const emailRow = document.getElementById('footer-email-row');
+    if (phoneLink && phoneDigits) phoneLink.href = `tel:+${phoneDigits.startsWith('55') ? phoneDigits : `55${phoneDigits}`}`;
+    if (emailLink && footer.email) emailLink.href = `mailto:${footer.email}`;
+    if (emailIconLink && footer.email) emailIconLink.href = `mailto:${footer.email}`;
+    if (phoneRow) phoneRow.classList.toggle('is-hidden', !phoneDigits);
+    if (emailRow) emailRow.classList.toggle('is-hidden', !footer.email);
+
+    const legalInfo = [footer.legalName, footer.document, footer.address].filter(Boolean).join(' · ');
+    const legalEl = document.getElementById('footer-legal-info');
+    if (legalEl) {
+      legalEl.textContent = legalInfo;
+      legalEl.classList.toggle('is-hidden', !legalInfo);
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -218,10 +273,8 @@
   // --------------------------------------------------------------------------
   function applyContent(content) {
     applyTheme(content.theme);
-    applyHero(content.hero);
-    applyCarousel(content.carousel);
+    applyCarousel(content.carousel, content.hero);
     applyFlashSale(content.flashSale);
-    applyAbout(content.about);
     applySpotlight(content.spotlight);
     applyFaq(content.faq);
     applyFooter(content.footer);

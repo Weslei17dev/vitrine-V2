@@ -3,7 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Loja online de produtos para adultos com atendimento humano, pagamento via PIX e envio discreto.">
+<meta name="description" content="Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.">
+<meta name="theme-color" content="#1A1A1A">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Brincar de Desejo — Bem-estar íntimo com discrição">
+<meta property="og:description" content="Seleção de produtos para adultos, conteúdo educativo e acompanhamento de pedidos.">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://*.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'">
 <title>Brincar de Desejo — Loja &amp; Painel Administrativo</title>
@@ -13,10 +18,11 @@
 <!-- Tipografia -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
-<!-- Gerador de QR Code (usado para exibir o "QR Code PIX" simulado) -->
+<!-- Gerador de QR Code para o payload PIX calculado pela API -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
 <link rel="stylesheet" href="css/style.css">
+<script src="js/frameGuard.js"></script>
 </head>
 <body>
 
@@ -45,7 +51,7 @@
     </a>
 
     <nav id="header-nav-links" class="header-nav">
-      <a href="#" data-nav="store"><i class="fa-solid fa-store"></i> Produtos</a>
+      <a href="#" data-nav="blog"><i class="fa-solid fa-book-open"></i> Blog</a>
       <a href="#" data-nav="customer-orders" id="nav-my-orders" class="is-hidden"><i class="fa-solid fa-receipt"></i> Meus Pedidos</a>
     </nav>
 
@@ -147,17 +153,12 @@
         <div class="form-grid">
           <div class="form-field form-field--span2">
             <label for="reg-name">Nome completo</label>
-            <input id="reg-name" name="name" type="text" placeholder="Seu nome completo" required>
-          </div>
-
-          <div class="form-field">
-            <label for="reg-cpf">CPF <span class="optional-tag">(opcional)</span></label>
-            <input id="reg-cpf" name="cpf" type="text" placeholder="000.000.000-00">
+            <input id="reg-name" name="name" type="text" placeholder="Seu nome completo" autocomplete="name" required>
           </div>
 
           <div class="form-field">
             <label for="reg-phone">Telefone</label>
-            <input id="reg-phone" name="phone" type="text" placeholder="(00) 00000-0000" required>
+            <input id="reg-phone" name="phone" type="text" placeholder="(00) 00000-0000" autocomplete="tel" inputmode="tel" required>
           </div>
 
           <div class="form-field form-field--span2">
@@ -172,22 +173,29 @@
 
           <div class="form-field form-field--span2">
             <label for="reg-address">Endereço</label>
-            <input id="reg-address" name="address" type="text" placeholder="Rua, número, bairro" required>
+            <input id="reg-address" name="address" type="text" placeholder="Rua, número, bairro" autocomplete="street-address" required>
           </div>
 
           <div class="form-field">
             <label for="reg-city">Cidade</label>
-            <input id="reg-city" name="city" type="text" placeholder="Sua cidade" required>
+            <input id="reg-city" name="city" type="text" placeholder="Sua cidade" autocomplete="address-level2" required>
           </div>
 
           <div class="form-field">
             <label for="reg-state">Estado</label>
-            <input id="reg-state" name="state" type="text" placeholder="UF" maxlength="2" style="text-transform:uppercase" required>
+            <input id="reg-state" name="state" type="text" placeholder="UF" maxlength="2" autocomplete="address-level1" style="text-transform:uppercase" required>
           </div>
 
           <div class="form-field">
             <label for="reg-zip">CEP</label>
-            <input id="reg-zip" name="zip" type="text" placeholder="00000-000" required>
+            <input id="reg-zip" name="zip" type="text" placeholder="00000-000" autocomplete="postal-code" inputmode="numeric" required>
+          </div>
+
+          <div class="form-field form-field--span2 form-field--checkbox consent-field">
+            <label>
+              <input name="adultConfirmed" type="checkbox" value="true" required>
+              <span>Confirmo que tenho 18 anos ou mais e li a <a href="#" data-action="open-legal" data-legal-target="legal-privacy">Política de Privacidade</a> e os <a href="#" data-action="open-legal" data-legal-target="legal-terms">Termos de Uso</a>.</span>
+            </label>
           </div>
         </div>
 
@@ -210,197 +218,130 @@
      VIEW: LOJA (catálogo de produtos)
 ============================================================= -->
 <section id="view-store" class="view">
-
-  <!-- Barra utilitária de contato -->
   <div class="store-utility-bar">
-    <div class="store-utility-bar__inner">
-      <a href="tel:+551148106810"><i class="fa-solid fa-phone"></i> (11) 4810-6810</a>
-      <span class="store-utility-bar__sep">·</span>
-      <span><i class="fa-solid fa-headset"></i> Central de Atendimento</span>
-      <span class="store-utility-bar__right"><i class="fa-solid fa-user-secret"></i> Sua compra é 100% discreta</span>
+    <div class="store-utility-bar__inner store-utility-bar__inner--center">
+      <span><i class="fa-solid fa-user-secret"></i> Navegação discreta e compra protegida</span>
     </div>
   </div>
 
-  <!-- Faixa de benefícios -->
   <div class="store-perks-bar">
     <div class="store-perks-bar__inner">
       <div class="store-perk"><i class="fa-solid fa-box"></i> Embalagem sem identificação</div>
-      <div class="store-perk"><i class="fa-solid fa-headset"></i> Atendimento humano</div>
-      <div class="store-perk"><i class="fa-solid fa-receipt"></i> Acompanhe o pedido online</div>
+      <div class="store-perk"><i class="fa-solid fa-comments"></i> Atendimento humano</div>
+      <div class="store-perk"><i class="fa-solid fa-receipt"></i> Acompanhamento online</div>
       <div class="store-perk"><i class="fa-solid fa-qrcode"></i> Pagamento via PIX</div>
     </div>
   </div>
 
-  <!-- Banner principal -->
-  <div class="store-hero-banner">
-    <div class="store-hero-banner__decor" aria-hidden="true"></div>
-    <div class="store-hero-banner__inner">
-      <span class="store-hero-banner__eyebrow" id="hero-eyebrow">Bem-vindo(a) à Brincar de Desejo</span>
-      <h1 id="hero-title">Desejo, prazer e sedução<br>em um só lugar.</h1>
-      <p id="hero-subtitle">Produtos selecionados com cuidado, entrega discreta e atendimento sem julgamentos. Veja o catálogo à vontade — o login só é pedido na hora de fechar o pedido.</p>
-      <a href="#product-grid-anchor" class="btn btn--accent btn--lg">
-        <i class="fa-solid fa-fire"></i> <span id="hero-cta-text">Ver produtos</span>
-      </a>
-    </div>
-  </div>
-
-  <!-- Carrossel de promoções (conteúdo carregado dinamicamente via js/siteContent.js) -->
-  <div class="promo-carousel-wrap">
-    <div class="promo-carousel" id="promo-carousel"></div>
-  </div>
+  <section class="store-hero-banner" aria-label="Destaques da loja">
+    <div class="promo-carousel promo-carousel--hero" id="promo-carousel" aria-live="off"></div>
+  </section>
 
   <div class="page-container">
+    <section id="selection-special" class="home-section selection-section" aria-labelledby="selection-title">
+      <div class="flash-sale-banner">
+        <div class="flash-sale-banner__info">
+          <span class="flash-sale-banner__tag"><i class="fa-solid fa-star"></i> <span id="flash-sale-tag">Seleção Especial</span></span>
+          <h2 id="selection-title"><span id="flash-sale-title">Escolhas para viver seus desejos</span></h2>
+          <p id="flash-sale-description">Uma curadoria cuidadosa para diferentes momentos e descobertas.</p>
+        </div>
+      </div>
+      <div id="featured-products-grid" class="featured-grid"></div>
+    </section>
 
-    <!-- Selos de confiança -->
-    <div class="trust-row">
-      <div class="trust-item"><i class="fa-solid fa-user-secret"></i><span>Privacidade Total</span></div>
-      <div class="trust-item"><i class="fa-solid fa-box-open"></i><span>Embalagem Discreta</span></div>
-      <div class="trust-item"><i class="fa-solid fa-receipt"></i><span>Status do Pedido</span></div>
-      <div class="trust-item"><i class="fa-solid fa-shield-heart"></i><span>Pagamento Seguro</span></div>
-    </div>
+    <section id="category-navigation-section" class="home-section category-section" aria-labelledby="category-navigation-title">
+      <div class="section-heading section-heading--center">
+        <span class="section-eyebrow">Encontre do seu jeito</span>
+        <h2 id="category-navigation-title">Navegue por categorias</h2>
+        <p>Escolha um caminho e vá direto ao que combina com você.</p>
+      </div>
+      <div id="category-navigation" class="category-navigation"></div>
+    </section>
 
-    <!-- Produtos em destaque (mais vendidos) -->
-    <div class="section-heading">
-      <h2><i class="fa-solid fa-fire"></i> Mais Vendidos</h2>
-      <p>Os produtos em destaque, favoritos entre os nossos clientes.</p>
-    </div>
-    <div id="featured-products-grid" class="featured-grid"></div>
+    <section class="home-section catalog-section" id="product-grid-anchor" aria-labelledby="catalog-title">
+      <div class="store-hero">
+        <div>
+          <span class="section-eyebrow">Explore com liberdade</span>
+          <h1 id="catalog-title">Catálogo de produtos</h1>
+          <p>Busque, filtre e conheça os detalhes antes de escolher.</p>
+        </div>
+        <div class="store-hero__search">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="product-search" type="search" placeholder="Buscar produto..." aria-label="Buscar produto">
+        </div>
+      </div>
+      <div id="category-filters" class="chip-list"></div>
+      <div id="product-grid" class="product-grid"></div>
+    </section>
 
-    <!-- Destaque de produto (foto + texto) -->
-    <div class="product-spotlight">
+    <section class="home-section how-section" aria-labelledby="how-title">
+      <div class="section-heading section-heading--center">
+        <span class="section-eyebrow">Do catálogo à entrega</span>
+        <h2 id="how-title">Como funciona</h2>
+        <p>Um processo simples, claro e discreto do início ao fim.</p>
+      </div>
+      <ol class="how-it-works">
+        <li class="how-step">
+          <span class="how-step__number">1</span>
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <h3>Escolha com calma</h3>
+          <p>Navegue pelo catálogo e veja todos os detalhes sem precisar entrar.</p>
+        </li>
+        <li class="how-step">
+          <span class="how-step__number">2</span>
+          <i class="fa-solid fa-cart-shopping"></i>
+          <h3>Revise o carrinho</h3>
+          <p>Entre na conta apenas para confirmar os dados e o endereço de entrega.</p>
+        </li>
+        <li class="how-step">
+          <span class="how-step__number">3</span>
+          <i class="fa-solid fa-qrcode"></i>
+          <h3>Pague via PIX</h3>
+          <p>Use o QR Code ou o código copia e cola e confira o valor no banco.</p>
+        </li>
+        <li class="how-step">
+          <span class="how-step__number">4</span>
+          <i class="fa-solid fa-truck-fast"></i>
+          <h3>Acompanhe o pedido</h3>
+          <p>Consulte o status na sua conta até a entrega em embalagem neutra.</p>
+        </li>
+      </ol>
+    </section>
+
+    <section class="home-section product-spotlight" aria-labelledby="spotlight-title">
       <div class="product-spotlight__image">
-        <img id="spotlight-image" src="img/promo-dessensibilizante.jpg" alt="Dessensibilizante Cliv Intt — conforto é prioridade">
+        <img id="spotlight-image" src="img/promo-dessensibilizante.jpg" alt="Destaque da semana da Brincar de Desejo">
       </div>
       <div class="product-spotlight__content">
-        <span class="section-eyebrow" id="spotlight-eyebrow">Mais vendido da semana</span>
-        <h2 id="spotlight-title">Dessensibilizante — conforto é prioridade</h2>
-        <p id="spotlight-text">Pensado para iniciantes ou amadores, prolonga o prazer com uma fórmula suave que não tira a sensibilidade. Aplicação simples e absorção rápida, para uma experiência mais confortável a dois.</p>
-        <a href="#product-grid-anchor" class="btn btn--primary"><i class="fa-solid fa-cart-plus"></i> <span id="spotlight-button-text">Ver produtos relacionados</span></a>
+        <span class="section-eyebrow" id="spotlight-eyebrow">Destaque da semana</span>
+        <h2 id="spotlight-title">Conforto e cuidado em primeiro lugar</h2>
+        <p id="spotlight-text">Conheça uma seleção pensada para proporcionar experiências mais confortáveis e especiais.</p>
+        <a href="#product-grid-anchor" class="btn btn--primary"><i class="fa-solid fa-arrow-right"></i> <span id="spotlight-button-text">Ver produtos relacionados</span></a>
       </div>
-    </div>
+    </section>
 
-    <!-- Como comprar -->
-    <div class="section-heading section-heading--center">
-      <h2>Como comprar</h2>
-      <p>Simples, rápido e 100% discreto do início ao fim.</p>
-    </div>
-    <div class="how-it-works">
-      <div class="how-step">
-        <span class="how-step__number">1</span>
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <h3>Escolha os produtos</h3>
-        <p>Navegue pelo catálogo à vontade, sem precisar criar conta.</p>
+    <section class="home-section blog-preview-section" aria-labelledby="blog-preview-title">
+      <div class="section-heading section-heading--center section-heading--with-action">
+        <div>
+          <span class="section-eyebrow">Informação sem tabu</span>
+          <h2 id="blog-preview-title">Blog Brincar de Desejo</h2>
+          <p>Conteúdo educativo para escolhas mais seguras e conscientes.</p>
+        </div>
+        <button type="button" class="btn btn--outline btn--sm" data-nav="blog">Ver todos</button>
       </div>
-      <div class="how-step">
-        <span class="how-step__number">2</span>
-        <i class="fa-solid fa-cart-shopping"></i>
-        <h3>Monte seu carrinho</h3>
-        <p>Adicione quantos produtos quiser e ajuste as quantidades.</p>
-      </div>
-      <div class="how-step">
-        <span class="how-step__number">3</span>
-        <i class="fa-solid fa-user-lock"></i>
-        <h3>Faça login</h3>
-        <p>Login ou cadastro rápido só é pedido na hora de fechar o pedido.</p>
-      </div>
-      <div class="how-step">
-        <span class="how-step__number">4</span>
-        <i class="fa-solid fa-qrcode"></i>
-        <h3>Pague com PIX</h3>
-        <p>Escaneie o QR Code e receba tudo em embalagem 100% discreta.</p>
-      </div>
-    </div>
+      <div id="blog-preview-grid" class="blog-grid"></div>
+    </section>
 
-    <!-- Oferta relâmpago -->
-    <div class="flash-sale-banner">
-      <div class="flash-sale-banner__info">
-        <span class="flash-sale-banner__tag"><i class="fa-solid fa-star"></i> <span id="flash-sale-tag">Seleção Especial</span></span>
-        <h2 id="flash-sale-title">Descubra os favoritos da loja</h2>
-        <p id="flash-sale-description">Produtos selecionados para tornar seus momentos ainda mais especiais.</p>
+    <section class="home-section faq-section" aria-labelledby="faq-title">
+      <div class="section-heading section-heading--center">
+        <span class="section-eyebrow">Dúvidas comuns</span>
+        <h2 id="faq-title">Perguntas Frequentes</h2>
+        <p>Informações importantes antes de finalizar a compra.</p>
       </div>
-    </div>
-
-    <div id="product-grid-anchor" class="store-hero">
-      <div>
-        <h1>Catálogo de produtos</h1>
-        <p>Escolha seus produtos favoritos e adicione ao carrinho.</p>
-      </div>
-      <div class="store-hero__search">
-        <i class="fa-solid fa-magnifying-glass"></i>
-        <input id="product-search" type="search" placeholder="Buscar produto..." aria-label="Buscar produto">
-      </div>
-    </div>
-
-    <div id="category-filters" class="chip-list"></div>
-
-    <div id="product-grid" class="product-grid"></div>
-
-    <!-- Como funciona o processo do pedido -->
-    <div class="section-heading section-heading--center">
-      <h2>Como funciona seu pedido</h2>
-      <p>Acompanhe cada etapa, do clique em "comprar" até a entrega na sua casa.</p>
-    </div>
-    <ol class="order-process">
-      <li class="order-process__step">
-        <span class="order-process__icon"><i class="fa-solid fa-cart-shopping"></i></span>
-        <h3>Pedido realizado</h3>
-        <p>Você monta o carrinho, faz login e confirma os dados de entrega.</p>
-      </li>
-      <li class="order-process__step">
-        <span class="order-process__icon"><i class="fa-solid fa-circle-check"></i></span>
-        <h3>Pedido aprovado</h3>
-        <p>Pague com PIX e informe o pagamento para conferência da equipe.</p>
-      </li>
-      <li class="order-process__step">
-        <span class="order-process__icon"><i class="fa-solid fa-truck-fast"></i></span>
-        <h3>Pedido enviado</h3>
-        <p>Separamos tudo e enviamos com embalagem 100% discreta.</p>
-      </li>
-      <li class="order-process__step">
-        <span class="order-process__icon"><i class="fa-solid fa-house"></i></span>
-        <h3>Pedido entregue</h3>
-        <p>Seu pedido chega até você, sem identificação da loja.</p>
-      </li>
-    </ol>
-
-    <!-- Quem somos -->
-    <div class="about-section">
-      <div class="about-section__image">
-        <img id="about-image" src="img/quem-somos.jpg" alt="Brincar de Desejo — brinque com responsabilidade e segurança">
-      </div>
-      <div class="about-section__content">
-        <span class="section-eyebrow" id="about-eyebrow">Quem somos</span>
-        <h2 id="about-title">Prazer, autoconhecimento e liberdade — sem tabus.</h2>
-        <p id="about-paragraph-1">A Brincar de Desejo nasceu para tornar o universo da sexualidade mais leve, acessível e livre de julgamentos. Selecionamos cada produto com cuidado, pensando em conforto, qualidade e segurança para todos os corpos e desejos.</p>
-        <p id="about-paragraph-2">Da escolha à entrega, prezamos pela sua privacidade: embalagens sem identificação, atendimento humano e discrição do primeiro clique até a porta de casa.</p>
-        <ul class="about-section__list" id="about-bullets"></ul>
-      </div>
-    </div>
-
-    <!-- Perguntas frequentes -->
-    <div class="section-heading section-heading--center">
-      <h2>Perguntas Frequentes</h2>
-      <p>Tudo o que você precisa saber antes de comprar.</p>
-    </div>
-    <div class="faq" id="faq"></div>
-
-    <div class="legal-notices">
-      <section id="privacy-notice" class="legal-notice">
-        <h2>Política de Privacidade</h2>
-        <p>Utilizamos os dados informados para criar sua conta, processar pedidos, organizar a entrega e prestar atendimento. Senhas são armazenadas somente em formato protegido. Para solicitar correção ou exclusão da conta, entre em contato pelo e-mail exibido no rodapé.</p>
-      </section>
-      <section id="exchange-notice" class="legal-notice">
-        <h2>Trocas e Devoluções</h2>
-        <p>Entre em contato com o atendimento informando o número do pedido. A equipe analisará o prazo, o estado do produto e as condições aplicáveis antes de orientar o envio.</p>
-      </section>
-      <section id="security-notice" class="legal-notice">
-        <h2>Compra Segura</h2>
-        <p>O pagamento disponível no site é PIX. Antes de pagar, confira no aplicativo do banco o nome do beneficiário e o valor do pedido. A confirmação do pagamento é feita pela equipe.</p>
-      </section>
-    </div>
+      <div class="faq" id="faq"></div>
+    </section>
   </div>
 
-  <!-- Rodapé institucional -->
   <footer class="store-footer">
     <div class="store-footer__inner">
       <div class="store-footer__col store-footer__col--brand">
@@ -408,39 +349,39 @@
           <span class="brand__mark"><img src="img/brand-icon.jpg" alt="Brincar de Desejo"></span>
           <span class="brand__name">Brincar de Desejo</span>
         </span>
-        <p id="footer-about">Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.</p>
-        <div class="store-footer__social"><a href="mailto:sac@brincardedesejo.com.br" aria-label="Enviar e-mail"><i class="fa-solid fa-envelope"></i></a></div>
+        <p id="footer-about">Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.</p>
+        <p id="footer-legal-info" class="store-footer__legal-info is-hidden"></p>
+        <div class="store-footer__social"><a id="footer-email-icon-link" href="mailto:sac@brincardedesejo.com.br" aria-label="Enviar e-mail"><i class="fa-solid fa-envelope"></i></a></div>
       </div>
 
       <div class="store-footer__col">
-        <h3>Institucional</h3>
+        <h3>Navegação</h3>
         <ul>
-          <li><a href="#about-title">Quem Somos</a></li>
-          <li><a href="#privacy-notice">Política de Privacidade</a></li>
-          <li><a href="#exchange-notice">Trocas e Devoluções</a></li>
-          <li><a href="#security-notice">Compra Segura</a></li>
+          <li><a href="#" data-nav="store">Início e catálogo</a></li>
+          <li><a href="#" data-nav="blog">Blog</a></li>
+          <li><a href="#" data-action="open-legal" data-legal-target="legal-privacy">Política de Privacidade</a></li>
+          <li><a href="#" data-action="open-legal" data-legal-target="legal-terms">Termos de Uso</a></li>
+          <li><a href="#" data-action="open-legal" data-legal-target="legal-exchanges">Trocas e Devoluções</a></li>
         </ul>
       </div>
 
       <div class="store-footer__col">
         <h3>Atendimento</h3>
         <ul>
-          <li><i class="fa-solid fa-phone"></i> <span id="footer-phone">(11) 4810-6810</span></li>
-          <li><i class="fa-solid fa-envelope"></i> <span id="footer-email">sac@brincardedesejo.com.br</span></li>
+          <li id="footer-phone-row"><i class="fa-solid fa-phone"></i> <a id="footer-phone-link" href="tel:+551148106810"><span id="footer-phone">(11) 4810-6810</span></a></li>
+          <li id="footer-email-row"><i class="fa-solid fa-envelope"></i> <a id="footer-email-link" href="mailto:sac@brincardedesejo.com.br"><span id="footer-email">sac@brincardedesejo.com.br</span></a></li>
           <li id="footer-hours-1">Seg. a Sex. das 8h às 18h</li>
           <li id="footer-hours-2">Sábados das 8h às 12h</li>
         </ul>
       </div>
 
       <div class="store-footer__col">
-        <h3>Formas de pagamento</h3>
-        <div class="store-footer__payments">
-          <span><i class="fa-solid fa-qrcode"></i> PIX</span>
-        </div>
-        <h3 class="store-footer__seals-title">Segurança</h3>
+        <h3>Pagamento</h3>
+        <div class="store-footer__payments"><span><i class="fa-solid fa-qrcode"></i> PIX</span></div>
+        <h3 class="store-footer__seals-title">Compromissos</h3>
         <div class="store-footer__seals">
-          <span><i class="fa-solid fa-lock"></i> Site Seguro</span>
-          <span><i class="fa-solid fa-user-secret"></i> Envio Discreto</span>
+          <span><i class="fa-solid fa-user-secret"></i> Embalagem neutra</span>
+          <span><i class="fa-solid fa-eye-slash"></i> Avaliações anônimas</span>
         </div>
       </div>
     </div>
@@ -449,6 +390,43 @@
       <p>Brincar de Desejo — Todos os direitos reservados. Venda proibida para menores de 18 anos.</p>
     </div>
   </footer>
+</section>
+
+<section id="view-blog" class="view content-view">
+  <div class="page-container content-page">
+    <button class="pd-back-link" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Voltar para a loja</button>
+    <header class="content-page__header">
+      <span class="section-eyebrow">Informação sem tabu</span>
+      <h1>Blog Brincar de Desejo</h1>
+      <p>Guias educativos sobre bem-estar íntimo, cuidado, consentimento e uso responsável.</p>
+    </header>
+    <div id="blog-grid" class="blog-grid blog-grid--page"></div>
+  </div>
+</section>
+
+<section id="view-blog-article" class="view content-view">
+  <div class="page-container article-page">
+    <button class="pd-back-link" data-nav="blog"><i class="fa-solid fa-arrow-left"></i> Voltar para o blog</button>
+    <article id="blog-article-content" class="blog-article"></article>
+  </div>
+</section>
+
+<section id="view-legal" class="view content-view">
+  <div class="page-container legal-page">
+    <button id="legal-back-button" class="pd-back-link" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Voltar para a loja</button>
+    <header class="content-page__header">
+      <span class="section-eyebrow">Transparência</span>
+      <h1>Informações legais e privacidade</h1>
+      <p>Consulte como a loja trata dados, pedidos, trocas e pagamentos.</p>
+    </header>
+    <nav class="legal-page__nav" aria-label="Seções legais">
+      <a href="#legal-privacy">Privacidade</a>
+      <a href="#legal-terms">Termos de Uso</a>
+      <a href="#legal-exchanges">Trocas e Devoluções</a>
+      <a href="#legal-security">Compra via PIX</a>
+    </nav>
+    <div id="legal-content" class="legal-page__content"></div>
+  </div>
 </section>
 
 <!-- ============================================================
@@ -533,13 +511,12 @@
         <form id="form-account-profile">
           <h2>Dados pessoais e entrega</h2>
           <div class="form-grid">
-            <div class="form-field form-field--span2"><label for="account-name">Nome</label><input id="account-name" name="name" required></div>
-            <div class="form-field"><label for="account-cpf">CPF opcional</label><input id="account-cpf" name="cpf"></div>
-            <div class="form-field"><label for="account-phone">Telefone</label><input id="account-phone" name="phone" required></div>
-            <div class="form-field form-field--span2"><label for="account-address">Endereço</label><input id="account-address" name="address" required></div>
-            <div class="form-field"><label for="account-city">Cidade</label><input id="account-city" name="city" required></div>
-            <div class="form-field"><label for="account-state">UF</label><input id="account-state" name="state" maxlength="2" required></div>
-            <div class="form-field"><label for="account-zip">CEP</label><input id="account-zip" name="zip" required></div>
+            <div class="form-field form-field--span2"><label for="account-name">Nome</label><input id="account-name" name="name" autocomplete="name" required></div>
+            <div class="form-field"><label for="account-phone">Telefone</label><input id="account-phone" name="phone" autocomplete="tel" inputmode="tel" required></div>
+            <div class="form-field form-field--span2"><label for="account-address">Endereço</label><input id="account-address" name="address" autocomplete="street-address" required></div>
+            <div class="form-field"><label for="account-city">Cidade</label><input id="account-city" name="city" autocomplete="address-level2" required></div>
+            <div class="form-field"><label for="account-state">UF</label><input id="account-state" name="state" maxlength="2" autocomplete="address-level1" required></div>
+            <div class="form-field"><label for="account-zip">CEP</label><input id="account-zip" name="zip" autocomplete="postal-code" inputmode="numeric" required></div>
           </div>
           <button type="submit" class="btn btn--primary btn--sm">Salvar dados</button>
         </form>
@@ -597,6 +574,9 @@
         <button class="admin-nav__item is-active" data-admin-tab="dashboard">
           <i class="fa-solid fa-chart-line"></i> Dashboard
         </button>
+        <button class="admin-nav__item" data-admin-tab="relatorios">
+          <i class="fa-solid fa-chart-pie"></i> Relatórios
+        </button>
         <button class="admin-nav__item" data-admin-tab="clientes">
           <i class="fa-solid fa-users"></i> Clientes
         </button>
@@ -605,6 +585,12 @@
         </button>
         <button class="admin-nav__item" data-admin-tab="produtos">
           <i class="fa-solid fa-boxes-stacked"></i> Produtos
+        </button>
+        <button class="admin-nav__item" data-admin-tab="avaliacoes">
+          <i class="fa-solid fa-star-half-stroke"></i> Avaliações
+        </button>
+        <button class="admin-nav__item" data-admin-tab="auditoria">
+          <i class="fa-solid fa-shield-halved"></i> Auditoria
         </button>
         <button class="admin-nav__item" data-admin-tab="personalizar">
           <i class="fa-solid fa-palette"></i> Personalizar
@@ -656,6 +642,185 @@
         </div>
       </div>
 
+      <!-- ---------- RELATÓRIOS GERENCIAIS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="relatorios">
+        <section class="reports-shell" aria-labelledby="reports-heading">
+          <header class="reports-header">
+            <div>
+              <span class="reports-eyebrow"><i class="fa-solid fa-chart-simple"></i> Inteligência comercial</span>
+              <h2 id="reports-heading">Relatórios da loja</h2>
+              <p>Compare períodos, encontre oportunidades e acompanhe vendas, produtos, clientes e pedidos.</p>
+            </div>
+            <div class="reports-header__actions">
+              <button id="reports-refresh-btn" type="button" class="btn btn--outline btn--sm">
+                <i class="fa-solid fa-arrows-rotate"></i> Atualizar
+              </button>
+              <button id="reports-export-btn" type="button" class="btn btn--outline btn--sm">
+                <i class="fa-solid fa-file-csv"></i> Exportar CSV
+              </button>
+              <button id="reports-print-btn" type="button" class="btn btn--primary btn--sm">
+                <i class="fa-solid fa-print"></i> Imprimir / PDF
+              </button>
+            </div>
+          </header>
+
+          <nav class="report-view-tabs" role="tablist" aria-label="Visões dos relatórios">
+            <button id="report-tab-overview" class="report-view-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="report-view-overview" data-report-tab="overview">
+              <i class="fa-solid fa-gauge-high"></i><span>Visão geral</span>
+            </button>
+            <button id="report-tab-products" class="report-view-tab" type="button" role="tab" aria-selected="false" aria-controls="report-view-products" data-report-tab="products" tabindex="-1">
+              <i class="fa-solid fa-box-open"></i><span>Produtos</span>
+            </button>
+            <button id="report-tab-customers" class="report-view-tab" type="button" role="tab" aria-selected="false" aria-controls="report-view-customers" data-report-tab="customers" tabindex="-1">
+              <i class="fa-solid fa-user-group"></i><span>Clientes</span>
+            </button>
+            <button id="report-tab-orders" class="report-view-tab" type="button" role="tab" aria-selected="false" aria-controls="report-view-orders" data-report-tab="orders" tabindex="-1">
+              <i class="fa-solid fa-receipt"></i><span>Pedidos</span>
+            </button>
+          </nav>
+
+          <form id="reports-filter-form" class="reports-filters">
+            <div class="reports-filters__heading">
+              <div><i class="fa-solid fa-sliders"></i><strong>Filtros do relatório</strong></div>
+              <button id="reports-clear-btn" class="reports-clear-btn" type="button">Limpar filtros</button>
+            </div>
+            <div class="reports-filter-grid">
+              <label class="reports-filter-field">
+                <span>Período rápido</span>
+                <select id="report-period-preset" name="preset">
+                  <option value="30d">Últimos 30 dias</option>
+                  <option value="today">Hoje</option>
+                  <option value="7d">Últimos 7 dias</option>
+                  <option value="thisMonth">Este mês</option>
+                  <option value="lastMonth">Mês anterior</option>
+                  <option value="90d">Últimos 90 dias</option>
+                  <option value="thisYear">Este ano</option>
+                  <option value="all">Todo o histórico</option>
+                  <option value="custom">Personalizado</option>
+                </select>
+              </label>
+              <label class="reports-filter-field">
+                <span>De</span>
+                <input id="report-start-date" name="startDate" type="date" required>
+              </label>
+              <label class="reports-filter-field">
+                <span>Até</span>
+                <input id="report-end-date" name="endDate" type="date" required>
+              </label>
+              <label class="reports-filter-field">
+                <span>Cliente</span>
+                <select id="report-customer-filter" name="customerId"><option value="">Todos os clientes</option></select>
+              </label>
+              <label class="reports-filter-field">
+                <span>Produto</span>
+                <select id="report-product-filter" name="productId"><option value="">Todos os produtos</option></select>
+              </label>
+              <label class="reports-filter-field">
+                <span>Categoria</span>
+                <select id="report-category-filter" name="category"><option value="">Todas as categorias</option></select>
+              </label>
+              <label class="reports-filter-field">
+                <span>Status do pedido</span>
+                <select id="report-status-filter" name="status">
+                  <option value="">Todos os status</option>
+                  <option>Aguardando Pagamento</option>
+                  <option>Aguardando Confirmação</option>
+                  <option>Pago</option>
+                  <option>Em Produção</option>
+                  <option>Enviado</option>
+                  <option>Finalizado</option>
+                  <option>Cancelado</option>
+                </select>
+              </label>
+              <label class="reports-filter-field">
+                <span>Agrupar linha do tempo</span>
+                <select id="report-granularity-filter" name="granularity">
+                  <option value="auto">Automático</option>
+                  <option value="day">Por dia</option>
+                  <option value="week">Por semana</option>
+                  <option value="month">Por mês</option>
+                </select>
+              </label>
+              <button id="reports-apply-btn" class="btn btn--primary reports-filter-submit" type="submit">
+                <i class="fa-solid fa-filter"></i> Aplicar filtros
+              </button>
+            </div>
+            <div class="reports-filter-summary">
+              <div id="reports-active-filters" class="reports-active-filters" aria-live="polite"></div>
+              <span id="reports-updated-at" class="reports-updated-at"></span>
+            </div>
+          </form>
+
+          <div id="reports-loading" class="reports-state reports-state--loading is-hidden" role="status">
+            <span class="reports-spinner" aria-hidden="true"></span>
+            <div><strong>Montando seu relatório</strong><span>Cruzando vendas, clientes, produtos e pedidos…</span></div>
+          </div>
+          <div id="reports-error" class="reports-state reports-state--error is-hidden" role="alert"></div>
+
+          <div id="reports-content" class="reports-content is-hidden">
+            <section id="report-view-overview" class="report-view is-active" role="tabpanel" aria-labelledby="report-tab-overview" data-report-view="overview">
+              <div class="report-section-heading"><div><span>Desempenho consolidado</span><h3>Visão geral</h3></div><p>Os cards comparam automaticamente o período selecionado com o período anterior de mesma duração.</p></div>
+              <div id="report-overview-kpis" class="report-kpi-grid"></div>
+              <div class="report-layout report-layout--hero">
+                <article class="report-card report-card--wide"><div class="report-card__header"><div><span>Faturamento</span><h3>Linha do tempo de receita</h3></div><span class="report-card__badge">Pedidos pagos</span></div><div id="report-overview-revenue-chart" class="report-chart report-chart--large"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Mix de vendas</span><h3>Status dos pedidos</h3></div></div><div id="report-overview-status-chart" class="report-chart"></div></article>
+              </div>
+              <div class="report-layout report-layout--3">
+                <article class="report-card"><div class="report-card__header"><div><span>Participação</span><h3>Categorias que mais vendem</h3></div></div><div id="report-overview-category-chart" class="report-chart"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Ranking</span><h3>Clientes que mais compram</h3></div></div><div id="report-overview-customer-chart" class="report-chart"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Ranking</span><h3>Produtos mais vendidos</h3></div></div><div id="report-overview-product-chart" class="report-chart"></div></article>
+              </div>
+              <article class="report-card report-insights-card"><div class="report-card__header"><div><span>Leitura automática</span><h3>O que merece sua atenção</h3></div><i class="fa-solid fa-wand-magic-sparkles"></i></div><div id="report-overview-insights" class="report-insights"></div></article>
+            </section>
+
+            <section id="report-view-products" class="report-view" role="tabpanel" aria-labelledby="report-tab-products" data-report-view="products" hidden>
+              <div class="report-section-heading"><div><span>Catálogo e demanda</span><h3>Visão de produtos</h3></div><p>Entenda volume, receita, participação por categoria e necessidade de reposição.</p></div>
+              <div id="report-product-kpis" class="report-kpi-grid"></div>
+              <div class="report-layout report-layout--hero">
+                <article class="report-card report-card--wide"><div class="report-card__header"><div><span>Demanda</span><h3>Unidades vendidas ao longo do tempo</h3></div></div><div id="report-product-timeline-chart" class="report-chart report-chart--large"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Receita</span><h3>Participação por categoria</h3></div></div><div id="report-product-category-chart" class="report-chart"></div></article>
+              </div>
+              <div class="report-layout report-layout--2">
+                <article class="report-card"><div class="report-card__header"><div><span>Top 10</span><h3>Produtos por faturamento</h3></div></div><div id="report-product-ranking-chart" class="report-chart"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Reposição</span><h3>Saúde do estoque</h3></div></div><div id="report-inventory-table" class="report-table-wrap"></div></article>
+              </div>
+              <article class="report-card report-insights-card"><div class="report-card__header"><div><span>Leitura de catálogo</span><h3>Análise de produtos</h3></div><i class="fa-solid fa-boxes-stacked"></i></div><div id="report-product-analysis" class="report-insights"></div></article>
+            </section>
+
+            <section id="report-view-customers" class="report-view" role="tabpanel" aria-labelledby="report-tab-customers" data-report-view="customers" hidden>
+              <div class="report-section-heading"><div><span>Relacionamento</span><h3>Visão de clientes</h3></div><p>Acompanhe aquisição, recorrência, valor médio, concentração e localização das compras.</p></div>
+              <div id="report-customer-kpis" class="report-kpi-grid"></div>
+              <div class="report-layout report-layout--hero">
+                <article class="report-card report-card--wide"><div class="report-card__header"><div><span>Clientes compradores</span><h3>Linha do tempo de compradores</h3></div></div><div id="report-customer-timeline-chart" class="report-chart report-chart--large"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Relacionamento</span><h3>Segmentos de clientes</h3></div></div><div id="report-customer-segment-chart" class="report-chart"></div></article>
+              </div>
+              <div class="report-layout report-layout--2">
+                <article class="report-card"><div class="report-card__header"><div><span>Valor acumulado</span><h3>Clientes por faturamento</h3></div></div><div id="report-customer-ranking-chart" class="report-chart"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Geografia</span><h3>Cidades que mais compram</h3></div></div><div id="report-region-chart" class="report-chart"></div></article>
+              </div>
+              <article class="report-card"><div class="report-card__header"><div><span>Detalhamento</span><h3>Indicadores por cliente</h3></div></div><div id="report-customer-table" class="report-table-wrap"></div></article>
+              <article class="report-card report-insights-card"><div class="report-card__header"><div><span>Leitura de relacionamento</span><h3>Análise de clientes</h3></div><i class="fa-solid fa-users-viewfinder"></i></div><div id="report-customer-analysis" class="report-insights"></div></article>
+            </section>
+
+            <section id="report-view-orders" class="report-view" role="tabpanel" aria-labelledby="report-tab-orders" data-report-view="orders" hidden>
+              <div class="report-section-heading"><div><span>Operação</span><h3>Visão de pedidos</h3></div><p>Analise volume, status, valor, dias e horários de maior movimento.</p></div>
+              <div id="report-order-kpis" class="report-kpi-grid"></div>
+              <div class="report-layout report-layout--hero">
+                <article class="report-card report-card--wide"><div class="report-card__header"><div><span>Volume</span><h3>Pedidos ao longo do tempo</h3></div></div><div id="report-order-timeline-chart" class="report-chart report-chart--large"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Fluxo operacional</span><h3>Distribuição por status</h3></div></div><div id="report-order-status-chart" class="report-chart"></div></article>
+              </div>
+              <div class="report-layout report-layout--2">
+                <article class="report-card"><div class="report-card__header"><div><span>Ticket</span><h3>Pedidos por faixa de valor</h3></div></div><div id="report-order-value-chart" class="report-chart"></div></article>
+                <article class="report-card"><div class="report-card__header"><div><span>Sazonalidade</span><h3>Movimento por dia da semana</h3></div></div><div id="report-weekday-chart" class="report-chart"></div></article>
+              </div>
+              <article class="report-card"><div class="report-card__header"><div><span>Horários de compra</span><h3>Mapa de calor por hora</h3></div><span class="report-card__badge">Horário de Brasília</span></div><div id="report-hour-heatmap" class="report-hour-heatmap"></div></article>
+              <article class="report-card"><div class="report-card__header"><div><span>Prioridade comercial</span><h3>Pedidos de maior valor</h3></div></div><div id="report-high-value-table" class="report-table-wrap"></div></article>
+              <article class="report-card report-insights-card"><div class="report-card__header"><div><span>Leitura operacional</span><h3>Análise de pedidos</h3></div><i class="fa-solid fa-list-check"></i></div><div id="report-order-analysis" class="report-insights"></div></article>
+            </section>
+          </div>
+        </section>
+      </div>
+
       <!-- ---------- CLIENTES ---------- -->
       <div class="admin-tab-panel" data-tab-panel="clientes">
         <div class="panel-card">
@@ -668,6 +833,7 @@
               <tbody id="admin-customers-tbody"></tbody>
             </table>
           </div>
+          <div class="table-pagination"><button id="admin-customers-load-more" type="button" class="btn btn--outline btn--sm">Carregar mais clientes</button></div>
         </div>
       </div>
 
@@ -683,6 +849,7 @@
               <tbody id="admin-orders-tbody"></tbody>
             </table>
           </div>
+          <div class="table-pagination"><button id="admin-orders-load-more" type="button" class="btn btn--outline btn--sm">Carregar mais pedidos</button></div>
         </div>
       </div>
 
@@ -701,6 +868,34 @@
                 <tr><th></th><th>Nome</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th></tr>
               </thead>
               <tbody id="admin-products-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- AVALIAÇÕES ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="avaliacoes">
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-star-half-stroke"></i> Moderação de avaliações</h2>
+          <p class="theme-hint">Novas avaliações ficam ocultas até serem aprovadas. Os nomes dos clientes nunca são publicados.</p>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead><tr><th>Produto</th><th>Identificação pública</th><th>Nota</th><th>Comentário</th><th>Data</th><th>Status</th><th>Ações</th></tr></thead>
+              <tbody id="admin-reviews-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- AUDITORIA ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="auditoria">
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-shield-halved"></i> Registro administrativo</h2>
+          <p class="theme-hint">Histórico das principais alterações feitas no painel.</p>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead><tr><th>Data</th><th>Administrador</th><th>Ação</th><th>Recurso</th><th>Detalhes</th></tr></thead>
+              <tbody id="admin-audit-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -785,25 +980,22 @@
             </div>
           </div>
 
-          <!-- Banner principal -->
+          <!-- Frete -->
           <div class="panel-card">
-            <div class="panel-card__header"><h2><i class="fa-solid fa-flag"></i> Banner Principal</h2></div>
+            <div class="panel-card__header"><h2><i class="fa-solid fa-truck-fast"></i> Frete</h2></div>
+            <p class="theme-hint">O servidor recalcula o frete antes de criar cada pedido. Use zero para oferecer frete grátis.</p>
             <div class="form-grid">
-              <div class="form-field form-field--span2">
-                <label for="sc-hero-eyebrow">Selo pequeno acima do título</label>
-                <input id="sc-hero-eyebrow" name="hero-eyebrow" type="text">
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-hero-title">Título (use Enter para quebrar linha)</label>
-                <textarea id="sc-hero-title" name="hero-title" rows="2"></textarea>
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-hero-subtitle">Subtítulo</label>
-                <textarea id="sc-hero-subtitle" name="hero-subtitle" rows="2"></textarea>
+              <div class="form-field">
+                <label for="sc-shipping-flat">Valor fixo do frete (R$)</label>
+                <input id="sc-shipping-flat" name="shipping-flat" type="number" min="0" step="0.01">
               </div>
               <div class="form-field">
-                <label for="sc-hero-cta">Texto do botão</label>
-                <input id="sc-hero-cta" name="hero-cta" type="text">
+                <label for="sc-shipping-free-above">Frete grátis a partir de (R$) <span class="optional-tag">(zero desativa)</span></label>
+                <input id="sc-shipping-free-above" name="shipping-free-above" type="number" min="0" step="0.01">
+              </div>
+              <div class="form-field">
+                <label for="sc-shipping-days">Prazo estimado (dias úteis)</label>
+                <input id="sc-shipping-days" name="shipping-days" type="number" min="1" max="60" step="1">
               </div>
             </div>
           </div>
@@ -811,15 +1003,16 @@
           <!-- Carrossel de banners -->
           <div class="panel-card">
             <div class="panel-card__header">
-              <h2><i class="fa-solid fa-images"></i> Carrossel de Banners</h2>
+              <h2><i class="fa-solid fa-images"></i> Banner em carrossel</h2>
               <button type="button" id="sc-carousel-add" class="btn btn--outline btn--sm"><i class="fa-solid fa-plus"></i> Adicionar slide</button>
             </div>
+            <p class="theme-hint">Cada slide possui imagem, frase e botão próprios. Recomendamos imagens horizontais em proporção próxima de 16:6.</p>
             <div id="sc-carousel-list" class="repeatable-list"></div>
           </div>
 
-          <!-- Oferta relâmpago -->
+          <!-- Seleção especial -->
           <div class="panel-card">
-            <div class="panel-card__header"><h2><i class="fa-solid fa-bolt"></i> Oferta Relâmpago</h2></div>
+            <div class="panel-card__header"><h2><i class="fa-solid fa-star"></i> Seleção Especial</h2></div>
             <div class="form-grid">
               <div class="form-field">
                 <label for="sc-flash-tag">Selo</label>
@@ -832,45 +1025,6 @@
               <div class="form-field form-field--span2">
                 <label for="sc-flash-description">Descrição</label>
                 <textarea id="sc-flash-description" name="flash-description" rows="2"></textarea>
-              </div>
-            </div>
-          </div>
-
-          <!-- Quem somos -->
-          <div class="panel-card">
-            <div class="panel-card__header"><h2><i class="fa-solid fa-heart"></i> Quem Somos</h2></div>
-            <div class="form-grid">
-              <div class="form-field form-field--span2">
-                <label>Imagem</label>
-                <div class="image-upload">
-                  <div class="image-upload__preview" id="sc-about-image-preview"><i class="fa-solid fa-image"></i></div>
-                  <div class="image-upload__actions">
-                    <label class="btn btn--outline btn--sm image-upload__btn">
-                      <i class="fa-solid fa-upload"></i> Trocar imagem
-                      <input type="file" id="sc-about-image-input" accept="image/*" class="image-upload__input">
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-about-eyebrow">Selo pequeno</label>
-                <input id="sc-about-eyebrow" name="about-eyebrow" type="text">
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-about-title">Título</label>
-                <input id="sc-about-title" name="about-title" type="text">
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-about-p1">Parágrafo 1</label>
-                <textarea id="sc-about-p1" name="about-p1" rows="3"></textarea>
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-about-p2">Parágrafo 2</label>
-                <textarea id="sc-about-p2" name="about-p2" rows="3"></textarea>
-              </div>
-              <div class="form-field form-field--span2">
-                <label for="sc-about-bullets">Lista de destaques (um por linha)</label>
-                <textarea id="sc-about-bullets" name="about-bullets" rows="3"></textarea>
               </div>
             </div>
           </div>
@@ -927,6 +1081,18 @@
                 <label for="sc-footer-about">Texto sobre a loja</label>
                 <textarea id="sc-footer-about" name="footer-about" rows="2"></textarea>
               </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-footer-legal-name">Razão social ou nome do responsável <span class="optional-tag">(opcional)</span></label>
+                <input id="sc-footer-legal-name" name="footer-legal-name" type="text">
+              </div>
+              <div class="form-field">
+                <label for="sc-footer-document">CNPJ/CPF do responsável <span class="optional-tag">(opcional)</span></label>
+                <input id="sc-footer-document" name="footer-document" type="text">
+              </div>
+              <div class="form-field form-field--span2">
+                <label for="sc-footer-address">Endereço comercial <span class="optional-tag">(opcional)</span></label>
+                <input id="sc-footer-address" name="footer-address" type="text">
+              </div>
               <div class="form-field">
                 <label for="sc-footer-phone">Telefone</label>
                 <input id="sc-footer-phone" name="footer-phone" type="text">
@@ -954,6 +1120,25 @@
     </main>
   </div>
 </section>
+
+<aside class="chat-helper" aria-label="Ajuda rápida">
+  <div id="chat-helper-panel" class="chat-helper__panel is-hidden" role="dialog" aria-modal="false" aria-labelledby="chat-helper-title">
+    <div class="chat-helper__header">
+      <div><span class="chat-helper__status" aria-hidden="true"></span><strong id="chat-helper-title">Como podemos ajudar?</strong></div>
+      <button type="button" class="chat-helper__close" data-chat-action="close" aria-label="Fechar ajuda"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p>Escolha um atalho. Se precisar falar com a equipe, use o contato exibido no rodapé.</p>
+    <div class="chat-helper__actions">
+      <button type="button" data-chat-action="catalog"><i class="fa-solid fa-magnifying-glass"></i> Encontrar produtos</button>
+      <button type="button" data-chat-action="orders"><i class="fa-solid fa-receipt"></i> Acompanhar pedido</button>
+      <button type="button" data-chat-action="faq"><i class="fa-solid fa-circle-question"></i> Ver dúvidas frequentes</button>
+      <button type="button" data-chat-action="privacy"><i class="fa-solid fa-user-shield"></i> Privacidade</button>
+    </div>
+  </div>
+  <button id="chat-helper-toggle" class="chat-helper__toggle" type="button" aria-label="Abrir ajuda rápida" aria-expanded="false" aria-controls="chat-helper-panel">
+    <i class="fa-solid fa-message"></i>
+  </button>
+</aside>
 
 <!-- ============================================================
      MODAL: CARRINHO (drawer lateral)
@@ -1022,6 +1207,8 @@
             Escaneie o QR Code abaixo no app do seu banco para pagar via PIX.
           </p>
           <div id="pix-qrcode-holder" class="pix-qrcode-holder"></div>
+          <label class="pix-copy-code-label" for="pix-copy-code">Código Pix copia e cola</label>
+          <textarea id="pix-copy-code" class="pix-copy-code" rows="3" readonly aria-label="Código Pix copia e cola"></textarea>
           <button id="pix-copy-btn" type="button" class="btn btn--outline btn--sm pix-copy-btn">
             <i class="fa-solid fa-copy"></i> Copiar código Pix
           </button>
@@ -1084,6 +1271,11 @@
           </div>
 
           <div class="form-field">
+            <label for="prod-compare-price">Valor anterior (R$) <span class="optional-tag">(opcional)</span></label>
+            <input id="prod-compare-price" name="compareAtPrice" type="number" min="0" step="0.01">
+          </div>
+
+          <div class="form-field">
             <label for="prod-category">Categoria</label>
             <input id="prod-category" name="category" type="text" placeholder="Ex: Eletrônicos" required>
           </div>
@@ -1126,7 +1318,7 @@
 
           <div class="form-field">
             <label for="prod-color">Cor de destaque</label>
-            <input id="prod-color" name="color" type="color" value="#2A3B8F">
+            <input id="prod-color" name="color" type="color" value="#D99163">
           </div>
 
           <div class="form-field">
@@ -1156,11 +1348,14 @@
 <script src="js/utils.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/siteContent.js"></script>
+<script src="js/blog.js"></script>
+<script src="js/legal.js"></script>
 <script src="js/products.js"></script>
 <script src="js/productDetail.js"></script>
 <script src="js/cart.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/customerArea.js"></script>
+<script src="js/adminReports.js"></script>
 <script src="js/adminPanel.js"></script>
 <script src="js/app.js"></script>
 

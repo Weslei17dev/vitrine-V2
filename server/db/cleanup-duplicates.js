@@ -19,10 +19,13 @@ async function main() {
       WITH ranked AS (
         SELECT id, name, category, price,
           row_number() OVER (
-            PARTITION BY lower(trim(name)), lower(trim(category)), price, trim(description)
+            PARTITION BY lower(trim(name)), lower(trim(category)), price, compare_at_price,
+              trim(description), trim(COALESCE(details, '')), icon, color, stock,
+              COALESCE(image, ''), gallery
             ORDER BY created_at, id
           ) AS position
         FROM products
+        WHERE active=true
       )
       SELECT id, name, category, price FROM ranked WHERE position > 1 ORDER BY name
     `);
@@ -39,21 +42,25 @@ async function main() {
     }
 
     await client.query('BEGIN');
-    const deleted = await client.query(`
+    const deactivated = await client.query(`
       WITH ranked AS (
         SELECT id,
           row_number() OVER (
-            PARTITION BY lower(trim(name)), lower(trim(category)), price, trim(description)
+            PARTITION BY lower(trim(name)), lower(trim(category)), price, compare_at_price,
+              trim(description), trim(COALESCE(details, '')), icon, color, stock,
+              COALESCE(image, ''), gallery
             ORDER BY created_at, id
           ) AS position
         FROM products
+        WHERE active=true
       )
-      DELETE FROM products p USING ranked r
+      UPDATE products p SET active=false, updated_at=now()
+      FROM ranked r
       WHERE p.id=r.id AND r.position > 1
       RETURNING p.id, p.name
     `);
     await client.query('COMMIT');
-    console.log(`✅ ${deleted.rowCount} produto(s) duplicado(s) removido(s).`);
+    console.log(`✅ ${deactivated.rowCount} produto(s) duplicado(s) desativado(s), sem apagar avaliações ou histórico.`);
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;

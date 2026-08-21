@@ -20,12 +20,11 @@ test('exige senha com tamanho, letras e números', () => {
 test('valida quantidades, dinheiro e imagens', () => {
   assert.equal(V.positiveInteger('2', 'Quantidade', 99), 2);
   assert.equal(V.positiveMoney('19.90'), 19.9);
+  assert.equal(V.nonNegativeMoney('0'), 0);
+  assert.equal(V.optionalMoney(''), null);
+  assert.match(V.timestamp('2026-08-20T12:00:00Z'), /^2026-08-20T12:00:00\.000Z$/);
   assert.equal(V.imageSource('img/produto.jpg'), 'img/produto.jpg');
   assert.throws(() => V.imageSource('javascript:alert(1)'), /inválido/);
   assert.throws(() => V.positiveInteger(-1, 'Quantidade'), /inválida/);
-});
-
-test('valida CPF', () => {
-  assert.equal(V.cpf('529.982.247-25'), '52998224725');
-  assert.throws(() => V.cpf('111.111.111-11'), /CPF válido/);
+  assert.throws(() => V.nonNegativeMoney(-1), /inválido/);
 });

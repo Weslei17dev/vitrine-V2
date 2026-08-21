@@ -16,7 +16,7 @@
   // --------------------------------------------------------------------------
   // Passo 1: revisão/confirmação dos dados antes de gerar o pedido
   // --------------------------------------------------------------------------
-  function renderCheckoutReview(items, total) {
+  function renderCheckoutReview(items, quote) {
     const user = global.App.state.currentUser;
     const container = document.getElementById('checkout-review');
     if (!container) return;
@@ -47,10 +47,11 @@
         <tbody>${itemsHtml}</tbody>
       </table>
 
-      <div class="checkout-total-row">
-        <span>Total do pedido</span>
-        <strong>${Utils.formatCurrency(total)}</strong>
+      <div class="checkout-costs">
+        <div><span>Subtotal</span><strong>${Utils.formatCurrency(quote.subtotal)}</strong></div>
+        <div><span>Frete${quote.estimatedDays ? ` · estimativa de ${quote.estimatedDays} dias úteis` : ''}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
       </div>
+      <div class="checkout-total-row"><span>Total do pedido</span><strong>${Utils.formatCurrency(quote.total)}</strong></div>
 
       <p class="checkout-confirm-hint">
         <i class="fa-solid fa-circle-info"></i>
@@ -58,15 +59,29 @@
       </p>`;
   }
 
-  function openCheckout(items, total) {
+  function openCheckout(items) {
     const idempotencyKey = global.crypto && global.crypto.randomUUID
       ? global.crypto.randomUUID()
       : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
-    pendingCheckout = { items, total, idempotencyKey };
+    pendingCheckout = { items, total: 0, idempotencyKey };
+    const confirmButton = document.getElementById('confirm-order-btn');
+    if (confirmButton) confirmButton.disabled = true;
     document.getElementById('checkout-step-review').classList.remove('is-hidden');
     document.getElementById('checkout-step-payment').classList.add('is-hidden');
-    renderCheckoutReview(items, total);
+    const review = document.getElementById('checkout-review');
+    if (review) review.innerHTML = '<div class="empty-state empty-state--inline"><i class="fa-solid fa-spinner fa-spin"></i><p>Conferindo estoque e frete...</p></div>';
     Utils.openModal('modal-checkout');
+    DataService.Orders.quote(items).then((quote) => {
+      const quotedItems = Array.isArray(quote.items) && quote.items.length ? quote.items : items;
+      pendingCheckout.items = quotedItems;
+      pendingCheckout.total = quote.total;
+      renderCheckoutReview(quotedItems, quote);
+      if (confirmButton) confirmButton.disabled = false;
+    }).catch((err) => {
+      if (confirmButton) confirmButton.disabled = false;
+      Utils.closeModal('modal-checkout');
+      Utils.showToast(err.message, 'error');
+    });
   }
 
   // --------------------------------------------------------------------------
@@ -119,13 +134,14 @@
         document.getElementById('checkout-step-payment').classList.remove('is-hidden');
         document.getElementById('payment-order-number').textContent = `#${order.number}`;
         document.getElementById('payment-order-total').textContent = Utils.formatCurrency(order.total);
-        renderPixQrCode(order);
-
-        // Notifica o painel do administrador (outra aba ou próxima renderização)
-        // de que um novo pedido chegou.
-        if (global.AdminPanelModule) {
-          global.AdminPanelModule.notifyNewOrder(order);
+        const pixCode = document.getElementById('pix-copy-code');
+        if (pixCode) pixCode.value = order.pixPayload || '';
+        const statusEl = document.querySelector('.pix-payment__status');
+        if (statusEl && order.expiresAt) {
+          const deadline = new Date(order.expiresAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+          statusEl.innerHTML = `<i class="fa-solid fa-clock"></i> Pague até ${Utils.escapeHtml(deadline)}`;
         }
+        renderPixQrCode(order);
       })
       .catch((err) => Utils.showToast(err.message, 'error'))
       .finally(() => {
@@ -139,8 +155,17 @@
     const btn = document.getElementById('pix-copy-btn');
     const restoreLabel = '<i class="fa-solid fa-copy"></i> Copiar código Pix';
 
-    navigator.clipboard
-      .writeText(currentOrder.pixPayload)
+    const codeField = document.getElementById('pix-copy-code');
+    const copyPromise = navigator.clipboard && global.isSecureContext
+      ? navigator.clipboard.writeText(currentOrder.pixPayload)
+      : new Promise((resolve, reject) => {
+          if (!codeField) return reject(new Error('Campo indisponível'));
+          codeField.focus();
+          codeField.select();
+          try { document.execCommand('copy') ? resolve() : reject(new Error('Cópia bloqueada')); } catch (err) { reject(err); }
+        });
+
+    copyPromise
       .then(() => {
         Utils.showToast('Código Pix copiado! Cole no app do seu banco.', 'success');
         if (btn) {
@@ -148,7 +173,10 @@
           setTimeout(() => { btn.innerHTML = restoreLabel; }, 2000);
         }
       })
-      .catch(() => Utils.showToast('Não foi possível copiar automaticamente. Selecione o código manualmente.', 'warning'));
+      .catch(() => {
+        if (codeField) { codeField.focus(); codeField.select(); }
+        Utils.showToast('Selecione o código exibido e copie manualmente.', 'warning');
+      });
   }
 
   function handlePaymentReported() {
@@ -186,7 +214,7 @@
       return `
         <div class="status-timeline status-timeline--cancelled">
           <i class="fa-solid fa-ban"></i>
-          <span>Este pedido foi cancelado.</span>
+          <span>Este pedido foi cancelado.${order.cancelReason ? ` Motivo: ${Utils.escapeHtml(order.cancelReason)}.` : ''}</span>
         </div>`;
     }
 
@@ -241,6 +269,8 @@
 
       ${buildStatusTimelineHtml(order)}
 
+      ${order.status === 'Aguardando Pagamento' && global.App.state.currentUser?.role === 'client' ? `<button type="button" class="btn btn--outline btn--sm" data-action="cancel-order-detail" data-id="${order.id}"><i class="fa-solid fa-ban"></i> Cancelar pedido</button>` : ''}
+
       <h4>Itens</h4>
       <table class="simple-table">
         <thead><tr><th>Produto</th><th>Qtd</th><th>Unitário</th><th>Subtotal</th></tr></thead>
@@ -248,14 +278,32 @@
       </table>
 
       <div class="checkout-total-row">
-        <span>Total do pedido</span>
-        <strong>${Utils.formatCurrency(order.total)}</strong>
+        <span>Subtotal</span><strong>${Utils.formatCurrency(order.subtotal)}</strong>
+      </div>
+      <div class="checkout-total-row">
+        <span>Frete</span><strong>${order.shippingTotal > 0 ? Utils.formatCurrency(order.shippingTotal) : 'Grátis'}</strong>
+      </div>
+      <div class="checkout-total-row">
+        <span>Total do pedido</span><strong>${Utils.formatCurrency(order.total)}</strong>
       </div>`;
   }
 
   function showOrderDetail(orderId) {
     DataService.Orders.getById(orderId).then((order) => {
       document.getElementById('order-detail-content').innerHTML = buildOrderDetailHtml(order);
+      const cancelBtn = document.querySelector('[data-action="cancel-order-detail"]');
+      if (cancelBtn) cancelBtn.addEventListener('click', () => {
+        if (!confirm('Cancelar este pedido e liberar os itens reservados?')) return;
+        cancelBtn.disabled = true;
+        DataService.Orders.cancel(order.id).then(() => {
+          Utils.closeModal('modal-order-detail');
+          Utils.showToast('Pedido cancelado e estoque liberado.', 'info');
+          global.CustomerAreaModule?.refresh();
+        }).catch((err) => {
+          cancelBtn.disabled = false;
+          Utils.showToast(err.message, 'error');
+        });
+      });
       Utils.openModal('modal-order-detail');
     });
   }

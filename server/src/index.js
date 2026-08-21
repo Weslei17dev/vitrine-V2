@@ -13,6 +13,7 @@ const cors = require('cors');
 const config = require('./config');
 const pool = require('./db');
 const { securityHeaders, globalLimiter } = require('./security');
+const { expirePendingOrders } = require('./utils/orderLifecycle');
 
 const app = express();
 app.disable('x-powered-by');
@@ -54,6 +55,8 @@ app.use('/api/orders', require('./routes/orders'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/site-content', require('./routes/siteContent'));
 app.use('/api/reviews', require('./routes/reviews'));
+app.use('/api/audit', require('./routes/audit'));
+app.use('/api/reports', require('./routes/reports'));
 
 app.use((req, res) => res.status(404).json({ message: 'Rota não encontrada.' }));
 
@@ -62,15 +65,21 @@ app.use((err, req, res, next) => {
   console.error(err);
   const status = Number(err.status) || (err.type === 'entity.too.large' ? 413 : 500);
   const publicMessage = status < 500 ? err.message : 'Erro interno do servidor.';
-  res.status(status).json({ message: publicMessage });
+  res.status(status).json({ message: publicMessage, ...(err.code ? { code: err.code } : {}) });
 });
 
 const server = app.listen(config.port, () => {
   console.log(`✅ API da Brincar de Desejo rodando na porta ${config.port}`);
 });
 
+const expirationTimer = setInterval(() => {
+  expirePendingOrders().catch((err) => console.error('[orders] Falha ao expirar reservas:', err.message));
+}, 60000);
+expirationTimer.unref();
+
 async function shutdown(signal) {
   console.log(`${signal} recebido. Encerrando conexões...`);
+  clearInterval(expirationTimer);
   server.close(async () => {
     await pool.end();
     process.exit(0);

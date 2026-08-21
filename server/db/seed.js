@@ -58,7 +58,7 @@ async function main() {
     // ------------------------------------------------------------------
     // Administrador
     // ------------------------------------------------------------------
-    const existingAdmin = await client.query('SELECT id FROM users WHERE lower(email) = $1', [ADMIN_EMAIL]);
+    const existingAdmin = await client.query('SELECT id, role FROM users WHERE lower(email) = $1', [ADMIN_EMAIL]);
     if (existingAdmin.rows.length === 0) {
       const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
       await client.query(
@@ -67,6 +67,9 @@ async function main() {
       );
       console.log(`✅ Conta de administrador criada: ${ADMIN_EMAIL}`);
     } else {
+      if (existingAdmin.rows[0].role !== 'admin') {
+        throw new Error('ADMIN_EMAIL pertence a uma conta de cliente. Escolha outro e-mail para não promover uma conta por engano.');
+      }
       const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
       await client.query(
         `UPDATE users SET name=$1, password_hash=$2, role='admin', token_version=token_version+1, updated_at=now()
@@ -84,7 +87,17 @@ async function main() {
       await client.query('INSERT INTO site_content (id, content) VALUES (1, $1)', [SITE_CONTENT_DEFAULTS]);
       console.log('✅ Conteúdo padrão do site criado (banners, textos, tema, FAQ, PIX).');
     } else {
-      const repairedContent = deepMerge(SITE_CONTENT_DEFAULTS, existingContent.rows[0].content || {});
+      const storedContent = existingContent.rows[0].content || {};
+      const repairedContent = deepMerge(SITE_CONTENT_DEFAULTS, storedContent);
+      if (storedContent.theme && storedContent.theme.primary === '#FF3D82' && storedContent.theme.bg === '#150A10') {
+        repairedContent.theme = { ...SITE_CONTENT_DEFAULTS.theme };
+      }
+      repairedContent.carousel = (Array.isArray(storedContent.carousel) ? storedContent.carousel : [])
+        .map((slide, index) => ({
+          ...(SITE_CONTENT_DEFAULTS.carousel[index % SITE_CONTENT_DEFAULTS.carousel.length] || SITE_CONTENT_DEFAULTS.carousel[0]),
+          ...(slide || {})
+        }));
+      if (!repairedContent.carousel.length) repairedContent.carousel = SITE_CONTENT_DEFAULTS.carousel;
       await client.query('UPDATE site_content SET content=$1, updated_at=now() WHERE id=1', [repairedContent]);
       console.log('✅ Conteúdo do site verificado e campos ausentes restaurados.');
     }
@@ -108,16 +121,16 @@ async function main() {
       // Algumas avaliações de exemplo nos dois primeiros produtos.
       if (insertedIds[0]) {
         await client.query(
-          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase) VALUES
-           ($1, 'Cliente demonstrativo', 5, 'Produto excelente e embalagem discreta.', false),
-           ($1, 'Cliente demonstrativo', 4, 'Gostei do produto e do atendimento.', false)`,
+          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase, approved) VALUES
+           ($1, 'Cliente', 5, 'Produto excelente e embalagem discreta.', false, true),
+           ($1, 'Cliente', 4, 'Gostei do produto e do atendimento.', false, true)`,
           [insertedIds[0]]
         );
       }
       if (insertedIds[1]) {
         await client.query(
-          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase) VALUES
-           ($1, 'Cliente demonstrativo', 5, 'Superou minhas expectativas.', false)`,
+          `INSERT INTO reviews (product_id, author_name, rating, comment, verified_purchase, approved) VALUES
+           ($1, 'Cliente', 5, 'Superou minhas expectativas.', false, true)`,
           [insertedIds[1]]
         );
       }

@@ -10,7 +10,13 @@
 (function (global) {
   'use strict';
 
-  let items = []; // [{ productId, name, price, icon, qty }]
+  let items = []; // [{ productId, name, price, icon, stock, qty }]
+
+  function maxQuantity(item) {
+    if (!item || item.stock == null || item.stock === '') return 99;
+    const stock = Number(item && item.stock);
+    return Number.isInteger(stock) && stock >= 0 ? Math.min(99, stock) : 99;
+  }
 
   function currentUserId() {
     const user = global.App.state.currentUser;
@@ -28,13 +34,15 @@
       const productId = String((item && item.productId) || '');
       const price = Number(item && item.price);
       const qty = Math.max(1, Math.min(99, Number.parseInt(item && item.qty, 10) || 1));
+      const parsedStock = Number.parseInt(item && item.stock, 10);
       if (!/^[0-9a-f-]{36}$/i.test(productId) || !Number.isFinite(price) || price <= 0) return null;
       return {
         productId,
         name: String(item.name || '').slice(0, 160),
         price,
         icon: String(item.icon || '🛍️').slice(0, 8),
-        qty
+        stock: Number.isInteger(parsedStock) && parsedStock >= 0 ? parsedStock : null,
+        qty: Math.min(qty, Number.isInteger(parsedStock) && parsedStock > 0 ? parsedStock : qty)
       };
     }).filter(Boolean);
   }
@@ -54,7 +62,7 @@
     [...(Array.isArray(userItems) ? userItems : []), ...(Array.isArray(guestItems) ? guestItems : [])].forEach((item) => {
       if (!item || !item.productId) return;
       const current = merged.get(item.productId);
-      if (current) current.qty = Math.min(99, current.qty + (Number(item.qty) || 1));
+      if (current) current.qty = Math.max(1, Math.min(maxQuantity(current) || 1, current.qty + (Number(item.qty) || 1)));
       else merged.set(item.productId, Object.assign({}, item, { qty: Math.max(1, Math.min(99, Number(item.qty) || 1)) }));
     });
     items = Array.from(merged.values());
@@ -64,8 +72,12 @@
   }
 
   function addItem(product) {
+    const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
+    if (stock < 1) return false;
     const existing = items.find((i) => i.productId === product.id);
     if (existing) {
+      existing.stock = stock;
+      if (existing.qty >= maxQuantity(existing)) return false;
       existing.qty += 1;
     } else {
       items.push({
@@ -73,17 +85,21 @@
         name: product.name,
         price: product.price,
         icon: product.icon,
+        stock,
         qty: 1
       });
     }
     persist();
     renderAll();
+    return true;
   }
 
   function updateQty(productId, qty) {
     const item = items.find((i) => i.productId === productId);
     if (!item) return;
-    item.qty = Math.max(1, Math.min(99, qty));
+    const maximum = maxQuantity(item);
+    if (maximum < 1) return;
+    item.qty = Math.max(1, Math.min(maximum, qty));
     persist();
     renderAll();
   }
@@ -112,6 +128,26 @@
     return items.reduce((sum, i) => sum + i.qty, 0);
   }
 
+  function reconcile(products) {
+    if (!Array.isArray(products)) return;
+    const available = new Map(products.filter((product) => product && product.active !== false).map((product) => [product.id, product]));
+    items = items.map((item) => {
+      const product = available.get(item.productId);
+      if (!product) return null;
+      const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
+      return {
+        productId: product.id,
+        name: product.name,
+        price: Number(product.price),
+        icon: product.icon,
+        stock,
+        qty: stock > 0 ? Math.min(item.qty, stock, 99) : 1
+      };
+    }).filter(Boolean);
+    persist();
+    renderAll();
+  }
+
   // --------------------------------------------------------------------------
   // Renderização
   // --------------------------------------------------------------------------
@@ -124,17 +160,19 @@
   }
 
   function cartItemRowHtml(item) {
+    const maximum = maxQuantity(item);
     return `
       <div class="cart-item" data-id="${Utils.escapeHtml(item.productId)}">
         <div class="cart-item__icon">${Utils.escapeHtml(item.icon || '🛍️')}</div>
         <div class="cart-item__info">
           <strong>${Utils.escapeHtml(item.name)}</strong>
           <span>${Utils.formatCurrency(item.price)} / un.</span>
+          ${maximum < 1 ? '<span class="cart-item__stock-warning">Indisponível no momento</span>' : ''}
         </div>
         <div class="cart-item__qty">
           <button data-action="dec" aria-label="Diminuir quantidade"><i class="fa-solid fa-minus"></i></button>
-          <input type="number" min="1" max="99" value="${item.qty}" data-action="set-qty" aria-label="Quantidade">
-          <button data-action="inc" aria-label="Aumentar quantidade"><i class="fa-solid fa-plus"></i></button>
+          <input type="number" min="1" max="${maximum || 1}" value="${item.qty}" data-action="set-qty" aria-label="Quantidade">
+          <button data-action="inc" aria-label="Aumentar quantidade" ${item.qty >= maximum ? 'disabled' : ''}><i class="fa-solid fa-plus"></i></button>
         </div>
         <div class="cart-item__subtotal">${Utils.formatCurrency(item.price * item.qty)}</div>
         <button class="cart-item__remove" data-action="remove" aria-label="Remover produto">
@@ -214,6 +252,10 @@
           Utils.showToast('Seu carrinho está vazio.', 'warning');
           return;
         }
+        if (items.some((item) => maxQuantity(item) < 1)) {
+          Utils.showToast('Remova os produtos indisponíveis antes de finalizar.', 'warning');
+          return;
+        }
         if (!global.App.state.currentUser) {
           Utils.closeModal('modal-cart');
           Utils.showToast('Seu carrinho foi salvo. Entre ou crie uma conta para finalizar.', 'info');
@@ -221,7 +263,7 @@
           return;
         }
         Utils.closeModal('modal-cart');
-        global.OrdersModule.openCheckout(items, getTotal());
+        global.OrdersModule.openCheckout(items);
       });
     }
   }
@@ -240,6 +282,7 @@
     getItems,
     getTotal,
     getItemCount,
+    reconcile,
     loadForCurrentUser,
     migrateGuestCart,
     renderAll

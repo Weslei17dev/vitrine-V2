@@ -2,10 +2,11 @@
 
 const SITE_CONTENT_DEFAULTS = {
   theme: {
-    bg: '#150A10', surface: '#211019', primary: '#FF3D82', primaryDark: '#C81760',
-    accent: '#FF3B4E', accentDark: '#C4172A', text: '#F5EBEF', textMuted: '#B49AA8', dark: '#0B0509'
+    bg: '#1A1A1A', surface: '#242424', primary: '#B91E1F', primaryDark: '#8F1517',
+    accent: '#D99163', accentDark: '#A8673F', text: '#FDFCFA', textMuted: '#D4C9C2', dark: '#101010'
   },
   pix: { chave: '', nomeBeneficiario: '', cidadeBeneficiario: '' },
+  shipping: { flatRate: 0, freeAbove: 0, estimatedDays: 7 },
   hero: {
     eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
     title: 'Desejo, prazer e sedução\nem um só lugar.',
@@ -13,9 +14,21 @@ const SITE_CONTENT_DEFAULTS = {
     ctaText: 'Ver produtos'
   },
   carousel: [
-    { image: 'img/promo-dessensibilizante.jpg', alt: 'Produtos selecionados para uma experiência mais confortável' },
-    { image: 'img/promo-bdsm.jpg', alt: 'Acessórios para explorar novos desejos' },
-    { image: 'img/promo-acessorios.jpg', alt: 'Acessórios para momentos especiais' }
+    {
+      image: 'img/promo-dessensibilizante.jpg', alt: 'Seleção de produtos voltada a conforto e cuidado',
+      eyebrow: 'Conforto em primeiro lugar', title: 'Descobertas mais leves,\nno seu ritmo.',
+      subtitle: 'Conheça opções selecionadas para começar com informação, cuidado e tranquilidade.', ctaText: 'Explorar catálogo', ctaTarget: 'catalog'
+    },
+    {
+      image: 'img/promo-bdsm.jpg', alt: 'Acessórios para explorar fantasias com responsabilidade',
+      eyebrow: 'Confiança e consentimento', title: 'Explore novos desejos\ncom responsabilidade.',
+      subtitle: 'Informação clara, limites respeitados e produtos para diferentes experiências.', ctaText: 'Ver categorias', ctaTarget: 'categories'
+    },
+    {
+      image: 'img/promo-acessorios.jpg', alt: 'Acessórios para diferentes momentos',
+      eyebrow: 'Escolhas para cada momento', title: 'Detalhes que transformam\na experiência.',
+      subtitle: 'Uma curadoria discreta para descobrir possibilidades a sós ou a dois.', ctaText: 'Conhecer seleção', ctaTarget: 'selection'
+    }
   ],
   flashSale: {
     tag: 'Seleção Especial', title: 'Descubra os favoritos da loja',
@@ -43,7 +56,8 @@ const SITE_CONTENT_DEFAULTS = {
     { q: 'Como meus dados são utilizados?', a: 'Os dados são utilizados para manter sua conta, processar o pedido, realizar a entrega e prestar atendimento.' }
   ],
   footer: {
-    about: 'Loja online de produtos para adultos com atendimento humano, pagamento via PIX e envio discreto.',
+    about: 'Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.',
+    legalName: '', document: '', address: '',
     phone: '(11) 4810-6810', email: 'sac@brincardedesejo.com.br',
     hours1: 'Seg. a Sex. das 8h às 18h', hours2: 'Sábados das 8h às 12h'
   }

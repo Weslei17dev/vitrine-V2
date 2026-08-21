@@ -34,6 +34,8 @@ ALLOWED_ORIGINS=https://SEU-USUARIO.github.io
 ADMIN_EMAIL=seu-admin@dominio.com.br
 ADMIN_PASSWORD=UMA_SENHA_FORTE_COM_LETRAS_E_NUMEROS
 ADMIN_NAME=Administrador
+ORDER_PAYMENT_TTL_MINUTES=30
+MAX_OPEN_ORDERS_PER_USER=3
 ```
 
 Em `ALLOWED_ORIGINS`, informe somente a origem, sem caminho e sem barra final. Para vários front-ends:
@@ -53,6 +55,10 @@ npm run migrate
 npm run seed
 npm test
 ```
+
+Nesta versão, a migração limpa CPFs legados que não são mais usados pelo cadastro, substitui nomes antigos das avaliações por identificações genéricas e atribui prazo às reservas PIX antigas. Pedidos vencidos poderão ser cancelados automaticamente e ter o estoque liberado. Confirme o backup antes de continuar.
+
+A migração também cria índices de apoio aos relatórios administrativos. Ela não recria nem apaga pedidos; os indicadores passam a ser calculados diretamente sobre o histórico existente.
 
 `npm run seed` também:
 
@@ -85,14 +91,17 @@ A política de segurança do `index.html` permite APIs em subdomínios `*.onrend
 
 Publique `index.html`, `css/`, `js/` e `img/` no GitHub Pages ou em outro host estático HTTPS. Não publique a pasta `server` junto do front-end se o repositório público não precisar dela; nunca publique `.env`.
 
-## 6. Configure o PIX
+## 6. Configure a loja e o PIX
 
 1. Entre como administrador.
-2. Abra **Personalizar → Recebimento via PIX**.
-3. Preencha chave, nome do beneficiário e cidade.
-4. Salve.
-5. Faça um pedido de teste de valor baixo.
-6. Antes de pagar, confira no banco o beneficiário e o valor.
+2. Abra **Personalizar**.
+3. Revise o texto individual de cada banner e as imagens do carrossel.
+4. Configure a tarifa de frete, o limite opcional para frete grátis e o prazo estimado.
+5. Preencha chave PIX, nome do beneficiário e cidade.
+6. Complete razão social, documento, endereço, telefone e e-mail do rodapé.
+7. Salve e faça um pedido de teste de valor baixo.
+8. Antes de pagar, confira o beneficiário, o frete, o total e o prazo da reserva.
+9. Abra **Relatórios**, selecione o mês atual e confira os totais de pedidos pagos, pendentes e cancelados.
 
 Sem uma configuração PIX válida, a API recusa novos pedidos em vez de gerar um QR Code incorreto.
 
@@ -107,9 +116,16 @@ Sem uma configuração PIX válida, a API recusa novos pedidos em vez de gerar u
 - [ ] PIX testado com valor baixo.
 - [ ] Produtos duplicados revisados.
 - [ ] Estoque conferido.
+- [ ] Frete, limite de gratuidade e prazo estimado conferidos.
+- [ ] Expiração de pedido PIX devolve o estoque corretamente.
+- [ ] Avaliação de teste permanece oculta até a aprovação no painel.
 - [ ] Endereço aparece no detalhe administrativo do pedido.
+- [ ] Relatórios do mês conferidos com a lista de pedidos pagos.
+- [ ] Exportação CSV e impressão/PDF da visão ativa testadas.
 - [ ] Links, telefone, e-mail e políticas foram ajustados para os dados reais da loja.
 - [ ] O site não anuncia cartão, frete grátis ou cupons sem que essas funções tenham sido implementadas.
+
+Recuperação de senha, confirmação de e-mail e MFA exigem um serviço externo de e-mail/autenticação. Essas funções não devem ser anunciadas até que esse provedor seja configurado.
 
 ## 8. Ordem segura de atualização futura
 

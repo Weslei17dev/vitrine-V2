@@ -5,12 +5,19 @@ const pool = require('../db');
 const { requireAdmin } = require('../auth-middleware');
 const { SITE_CONTENT_DEFAULTS, deepMerge } = require('../site-defaults');
 const V = require('../validation');
+const { recordAudit } = require('../utils/audit');
 
 const router = express.Router();
 
 async function readContent() {
   const result = await pool.query('SELECT content FROM site_content WHERE id = 1');
-  return deepMerge(SITE_CONTENT_DEFAULTS, result.rows[0] ? result.rows[0].content : {});
+  const content = deepMerge(SITE_CONTENT_DEFAULTS, result.rows[0] ? result.rows[0].content : {});
+  const defaults = SITE_CONTENT_DEFAULTS.carousel;
+  content.carousel = (Array.isArray(content.carousel) ? content.carousel : []).map((slide, index) => ({
+    ...(defaults[index % defaults.length] || defaults[0]),
+    ...(slide || {})
+  }));
+  return content;
 }
 
 function shortText(value, label, max = 300) {
@@ -19,15 +26,20 @@ function shortText(value, label, max = 300) {
 
 function normalizeImageList(list) {
   if (!Array.isArray(list)) return [];
-  if (list.length > 6) throw new V.ValidationError('O carrossel aceita no máximo 6 imagens.');
+  if (list.length > 4) throw new V.ValidationError('O banner aceita no máximo 4 slides.');
   return list.map((slide, index) => ({
     image: V.imageSource(slide && slide.image, `Imagem ${index + 1} do carrossel`),
-    alt: shortText(slide && slide.alt, 'Texto alternativo', 180)
+    alt: shortText(slide && slide.alt, 'Texto alternativo', 180),
+    eyebrow: shortText(slide && slide.eyebrow, 'Selo do slide', 100),
+    title: shortText(slide && slide.title, 'Título do slide', 180),
+    subtitle: shortText(slide && slide.subtitle, 'Frase do slide', 500),
+    ctaText: shortText(slide && slide.ctaText, 'Botão do slide', 60) || 'Ver catálogo',
+    ctaTarget: ['catalog', 'categories', 'selection'].includes(slide && slide.ctaTarget) ? slide.ctaTarget : 'catalog'
   })).filter((slide) => slide.image);
 }
 
 function normalizeContent(content) {
-  const requiredSections = ['theme', 'pix', 'hero', 'flashSale', 'about', 'spotlight', 'footer'];
+  const requiredSections = ['theme', 'pix', 'shipping', 'hero', 'flashSale', 'about', 'spotlight', 'footer'];
   for (const section of requiredSections) {
     if (!content[section] || typeof content[section] !== 'object' || Array.isArray(content[section])) {
       throw new V.ValidationError(`Seção de personalização inválida: ${section}.`);
@@ -49,6 +61,11 @@ function normalizeContent(content) {
       chave: shortText(content.pix.chave, 'Chave PIX', 77),
       nomeBeneficiario: shortText(content.pix.nomeBeneficiario, 'Nome do beneficiário', 25),
       cidadeBeneficiario: shortText(content.pix.cidadeBeneficiario, 'Cidade do beneficiário', 15)
+    },
+    shipping: {
+      flatRate: V.nonNegativeMoney(content.shipping.flatRate || 0, 'Valor do frete'),
+      freeAbove: V.nonNegativeMoney(content.shipping.freeAbove || 0, 'Limite para frete grátis'),
+      estimatedDays: V.positiveInteger(content.shipping.estimatedDays || 7, 'Prazo do frete', 60)
     },
     hero: {
       eyebrow: shortText(content.hero.eyebrow, 'Selo do banner', 100),
@@ -83,6 +100,9 @@ function normalizeContent(content) {
     })).filter((item) => item.q && item.a),
     footer: {
       about: shortText(content.footer.about, 'Texto do rodapé', 500),
+      legalName: shortText(content.footer.legalName, 'Razão social', 180),
+      document: shortText(content.footer.document, 'Documento comercial', 40),
+      address: shortText(content.footer.address, 'Endereço comercial', 300),
       phone: shortText(content.footer.phone, 'Telefone do rodapé', 40),
       email: shortText(content.footer.email, 'E-mail do rodapé', 254),
       hours1: shortText(content.footer.hours1, 'Horário de atendimento', 120),
@@ -102,7 +122,7 @@ router.get('/admin', requireAdmin, async (req, res, next) => {
 router.get('/', async (req, res, next) => {
   try {
     const content = await readContent();
-    const { pix, ...publicContent } = content;
+    const { pix, about, ...publicContent } = content;
     res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
     res.json(publicContent);
   } catch (err) {
@@ -114,11 +134,18 @@ router.put('/', requireAdmin, async (req, res, next) => {
   try {
     const current = await readContent();
     const normalized = normalizeContent(deepMerge(current, req.body || {}));
+    if (JSON.stringify(normalized).length > 2500000) {
+      throw new V.ValidationError('A personalização ficou muito grande. Reduza a quantidade ou o tamanho das imagens.');
+    }
     await pool.query(
       `INSERT INTO site_content (id, content, updated_at) VALUES (1, $1, now())
        ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = now()`,
       [normalized]
     );
+    await recordAudit(pool, {
+      adminId: req.user.id, action: 'site_content.update', entityType: 'site_content', entityId: '1',
+      details: { sections: Object.keys(req.body || {}) }
+    });
     res.json(normalized);
   } catch (err) {
     next(err);
@@ -127,12 +154,25 @@ router.put('/', requireAdmin, async (req, res, next) => {
 
 router.post('/reset', requireAdmin, async (req, res, next) => {
   try {
+    const current = await readContent();
+    const resetContent = deepMerge(SITE_CONTENT_DEFAULTS, {
+      pix: current.pix,
+      footer: {
+        legalName: current.footer.legalName,
+        document: current.footer.document,
+        address: current.footer.address
+      }
+    });
     await pool.query(
       `INSERT INTO site_content (id, content, updated_at) VALUES (1, $1, now())
        ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content, updated_at = now()`,
-      [SITE_CONTENT_DEFAULTS]
+      [resetContent]
     );
-    res.json(SITE_CONTENT_DEFAULTS);
+    await recordAudit(pool, {
+      adminId: req.user.id, action: 'site_content.reset', entityType: 'site_content', entityId: '1',
+      details: { preserved: ['pix', 'footer.legalName', 'footer.document', 'footer.address'] }
+    });
+    res.json(resetContent);
   } catch (err) {
     next(err);
   }

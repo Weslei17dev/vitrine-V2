@@ -26,6 +26,7 @@
         </div>
         <div class="order-card__side">
           <span class="order-card__total">${Utils.formatCurrency(order.total)}</span>
+          ${order.status === 'Aguardando Pagamento' ? `<button class="btn btn--outline btn--sm" data-action="cancel-order" data-id="${order.id}"><i class="fa-solid fa-ban"></i> Cancelar</button>` : ''}
           <button class="btn btn--outline btn--sm" data-action="view-order" data-id="${order.id}">
             <i class="fa-solid fa-eye"></i> Detalhes
           </button>
@@ -106,6 +107,18 @@
       list.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="view-order"]');
         if (btn) global.OrdersModule.showOrderDetail(btn.dataset.id);
+        const cancelBtn = e.target.closest('[data-action="cancel-order"]');
+        if (cancelBtn) {
+          if (!confirm('Cancelar este pedido e liberar os itens reservados?')) return;
+          cancelBtn.disabled = true;
+          DataService.Orders.cancel(cancelBtn.dataset.id).then(() => {
+            Utils.showToast('Pedido cancelado e estoque liberado.', 'info');
+            fetchAndRender(false);
+          }).catch((err) => {
+            cancelBtn.disabled = false;
+            Utils.showToast(err.message, 'error');
+          });
+        }
       });
     }
 
@@ -121,7 +134,6 @@
         }).catch((err) => Utils.showToast(err.message, 'error'));
       });
       profileForm.elements.phone.addEventListener('input', (e) => { e.target.value = Utils.maskPhone(e.target.value); });
-      profileForm.elements.cpf.addEventListener('input', (e) => { e.target.value = Utils.maskCpf(e.target.value); });
       profileForm.elements.zip.addEventListener('input', (e) => { e.target.value = Utils.maskCep(e.target.value); });
     }
 
@@ -141,7 +153,7 @@
     const deleteForm = document.getElementById('form-delete-account');
     if (deleteForm) deleteForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!confirm('Excluir definitivamente sua conta? Esta ação não pode ser desfeita.')) return;
+      if (!confirm('Excluir definitivamente sua conta? Avaliações serão removidas e pedidos concluídos serão anonimizados. Pedidos em andamento precisam ser finalizados ou cancelados antes.')) return;
       const userId = global.App.state.currentUser && global.App.state.currentUser.id;
       DataService.Auth.deleteAccount(e.target.elements.password.value).then(() => {
         if (userId) DataService.Cart.clear(userId);
@@ -156,7 +168,7 @@
     const user = global.App.state.currentUser;
     const form = document.getElementById('form-account-profile');
     if (!user || !form) return;
-    ['name', 'cpf', 'phone', 'address', 'city', 'state', 'zip'].forEach((field) => {
+    ['name', 'phone', 'address', 'city', 'state', 'zip'].forEach((field) => {
       if (form.elements[field]) form.elements[field].value = user[field] || '';
     });
   }

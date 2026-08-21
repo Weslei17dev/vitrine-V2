@@ -67,7 +67,9 @@
   function renderInfo(product) {
     document.getElementById('pd-category').textContent = product.category;
     document.getElementById('pd-name').textContent = product.name;
-    document.getElementById('pd-price').textContent = Utils.formatCurrency(product.price);
+    const compareAt = Number(product.compareAtPrice || 0);
+    const price = Number(product.price || 0);
+    document.getElementById('pd-price').innerHTML = `${compareAt > price ? `<span class="product-price-old">${Utils.formatCurrency(compareAt)}</span>` : ''}<span>${Utils.formatCurrency(price)}</span><small> à vista no PIX</small>`;
     document.getElementById('pd-description').textContent = product.description;
 
     const detailsBlock = document.querySelector('.pd-details-block');
@@ -170,12 +172,11 @@
 
     DataService.Reviews.create({
       productId: currentProduct.id,
-      authorName: currentUser.name,
       rating: selectedRating,
       comment
     })
       .then(() => {
-        Utils.showToast('Avaliação enviada, obrigado!', 'success');
+        Utils.showToast('Avaliação enviada para análise. Obrigado!', 'success');
         commentEl.value = '';
         setSelectedRating(5);
         loadReviews(currentProduct.id);
@@ -203,6 +204,10 @@
   // --------------------------------------------------------------------------
   function relatedCardHtml(product) {
     const safeImage = Utils.safeImageSrc(product.image);
+    const unavailable = Number(product.stock) <= 0;
+    const compareAt = Number(product.compareAtPrice || 0);
+    const price = Number(product.price || 0);
+    const ratingCount = Number(product.ratingCount || 0);
     const imageHtml = safeImage
       ? `<img class="product-card__photo" src="${Utils.escapeHtml(safeImage)}" alt="${Utils.escapeHtml(product.name)}" loading="lazy">`
       : `<span style="font-size:2.6rem">${Utils.escapeHtml(product.icon || '🛍️')}</span>`;
@@ -214,12 +219,17 @@
         </div>
         <div class="product-card__body">
           <h3>${Utils.escapeHtml(product.name)}</h3>
-          <p>${Utils.escapeHtml(product.description)}</p>
+          <p class="product-card__description">${Utils.escapeHtml(product.description)}</p>
+          <div class="product-card__meta">${ratingCount ? `<span class="product-rating"><i class="fa-solid fa-star"></i> ${Number(product.ratingAverage || 0).toFixed(1)} <small>(${ratingCount})</small></span>` : '<span class="text-muted">Ainda sem avaliações</span>'}</div>
         </div>
         <div class="product-card__footer">
-          <span class="product-card__price">${Utils.formatCurrency(product.price)}</span>
-          <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${product.id}">
-            <i class="fa-solid fa-cart-plus"></i> Adicionar
+          <div class="product-pricing">
+            ${compareAt > price ? `<span class="product-price-old">${Utils.formatCurrency(compareAt)}</span>` : ''}
+            <span class="product-card__price">${Utils.formatCurrency(price)}</span>
+            <span class="product-card__payment">à vista no PIX</span>
+          </div>
+          <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${product.id}" ${unavailable ? 'disabled' : ''}>
+            <i class="fa-solid ${unavailable ? 'fa-ban' : 'fa-cart-plus'}"></i> ${unavailable ? 'Indisponível' : 'Adicionar'}
           </button>
         </div>
       </article>`;
@@ -276,6 +286,7 @@
     DataService.Products.getById(productId)
       .then((product) => {
         currentProduct = product;
+        document.title = `${product.name} — Brincar de Desejo`;
         setSelectedRating(5);
         const commentEl = document.getElementById('pd-review-comment');
         if (commentEl) commentEl.value = '';

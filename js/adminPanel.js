@@ -14,6 +14,9 @@
   let pollingHandle = null;
   let bootstrapped = false; // evita notificar pedidos que já existiam ao abrir o painel
   let editingProductId = null;
+  let editingProductUpdatedAt = null;
+  const PAGE_SIZE = 100;
+  let cachedOrders = [];
   let cachedCustomers = [];
   let currentProductImage = null; // dataURL da foto enviada no formulário de produto
   let currentProductGallery = []; // dataURLs das fotos adicionais (galeria da página do produto)
@@ -21,7 +24,7 @@
   // ==========================================================================
   // DASHBOARD
   // ==========================================================================
-  function renderDashboard(orders, customers) {
+  function renderDashboard(summary) {
     const totalOrders = document.getElementById('admin-kpi-total-orders');
     const totalRevenue = document.getElementById('admin-kpi-revenue');
     const pendingOrders = document.getElementById('admin-kpi-pending');
@@ -29,22 +32,13 @@
     const totalCustomers = document.getElementById('admin-kpi-customers');
     if (!totalOrders) return;
 
-    const revenue = orders
-      .filter((o) => !['Cancelado', 'Aguardando Pagamento', 'Aguardando Confirmação'].includes(o.status))
-      .reduce((sum, o) => sum + o.total, 0);
+    totalOrders.textContent = summary.totalOrders || 0;
+    totalRevenue.textContent = Utils.formatCurrency(summary.revenue || 0);
+    pendingOrders.textContent = summary.pendingOrders || 0;
+    paidOrders.textContent = summary.paidOrders || 0;
+    totalCustomers.textContent = summary.totalCustomers || 0;
 
-    const pendingCount = orders.filter((o) =>
-      ['Aguardando Pagamento', 'Aguardando Confirmação'].includes(o.status)
-    ).length;
-    const paidCount = orders.filter((o) => o.status === 'Pago').length;
-
-    totalOrders.textContent = orders.length;
-    totalRevenue.textContent = Utils.formatCurrency(revenue);
-    pendingOrders.textContent = pendingCount;
-    paidOrders.textContent = paidCount;
-    totalCustomers.textContent = customers.length;
-
-    renderRecentOrdersWidget(orders.slice(0, 5));
+    renderRecentOrdersWidget(summary.recentOrders || []);
   }
 
   function renderRecentOrdersWidget(orders) {
@@ -206,6 +200,7 @@
 
   function openProductForm(product) {
     editingProductId = product ? product.id : null;
+    editingProductUpdatedAt = product ? product.updatedAt : null;
     const form = document.getElementById('form-product');
     form.reset();
 
@@ -215,19 +210,21 @@
       form.elements.name.value = product.name;
       form.elements.description.value = product.description;
       form.elements.price.value = product.price;
+      form.elements.compareAtPrice.value = product.compareAtPrice || '';
       form.elements.category.value = product.category;
       form.elements.icon.value = product.icon || '';
-      form.elements.color.value = product.color || '#2A3B8F';
+      form.elements.color.value = product.color || '#D99163';
       form.elements.stock.value = product.stock ?? 0;
       form.elements.active.checked = product.active !== false;
       form.elements.details.value = product.details || '';
       currentProductImage = product.image || null;
       currentProductGallery = Array.isArray(product.gallery) ? product.gallery.slice() : [];
     } else {
-      form.elements.color.value = '#2A3B8F';
+      form.elements.color.value = '#D99163';
       form.elements.active.checked = true;
       currentProductImage = null;
       currentProductGallery = [];
+      editingProductUpdatedAt = null;
     }
     updateProductImagePreview();
     renderProductGalleryRows();
@@ -313,20 +310,25 @@
       name: form.elements.name.value.trim(),
       description: form.elements.description.value.trim(),
       price: parseFloat(form.elements.price.value) || 0,
+      compareAtPrice: parseFloat(form.elements.compareAtPrice.value) || null,
       category: form.elements.category.value.trim() || 'Geral',
       icon: form.elements.icon.value.trim() || '🛍️',
-      color: form.elements.color.value || '#2A3B8F',
+      color: form.elements.color.value || '#D99163',
       stock: parseInt(form.elements.stock.value, 10) || 0,
       active: form.elements.active.checked,
       image: currentProductImage || null,
       gallery: currentProductGallery.filter(Boolean),
-      details: form.elements.details.value.trim()
+      details: form.elements.details.value.trim(),
+      updatedAt: editingProductUpdatedAt
     };
 
     if (!payload.name || !payload.description || payload.price <= 0) {
       Utils.showToast('Preencha nome, descrição e um preço válido.', 'warning');
       return;
     }
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
 
     const action = editingProductId
       ? DataService.Products.update(editingProductId, payload)
@@ -336,9 +338,11 @@
       Utils.closeModal('modal-product-form');
       Utils.showToast(editingProductId ? 'Produto atualizado.' : 'Produto criado.', 'success');
       editingProductId = null;
+      editingProductUpdatedAt = null;
       loadProducts();
       if (global.ProductsModule) global.ProductsModule.loadAndRender(true);
-    }).catch((err) => Utils.showToast(err.message, 'error'));
+    }).catch((err) => Utils.showToast(err.message, 'error'))
+      .finally(() => { if (submitBtn) submitBtn.disabled = false; });
   }
 
   function handleDeleteProduct(productId) {
@@ -355,11 +359,60 @@
   }
 
   // ==========================================================================
-  // PERSONALIZAR (banners, quem somos, destaque, FAQ, rodapé)
+  // MODERAÇÃO DE AVALIAÇÕES E AUDITORIA
   // ==========================================================================
-  let siteCarouselSlides = []; // [{ image, alt }]
+  function renderReviewsTable(reviews) {
+    const tbody = document.getElementById('admin-reviews-tbody');
+    if (!tbody) return;
+    if (!reviews.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty-cell">Nenhuma avaliação recebida.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = reviews.map((review) => `
+      <tr data-id="${review.id}">
+        <td>${Utils.escapeHtml(review.productName)}</td>
+        <td>${Utils.escapeHtml(review.authorName)}</td>
+        <td><span class="product-rating"><i class="fa-solid fa-star"></i> ${review.rating}/5</span></td>
+        <td class="cell-truncate" title="${Utils.escapeHtml(review.comment)}">${Utils.escapeHtml(review.comment)}</td>
+        <td>${Utils.escapeHtml(review.date)}</td>
+        <td><span class="status-pill ${review.approved ? 'status-pill--on' : 'status-pill--off'}">${review.approved ? 'Publicada' : 'Pendente'}</span></td>
+        <td class="table-actions">
+          ${review.approved ? '' : '<button class="btn-icon" data-action="approve-review" title="Aprovar"><i class="fa-solid fa-check"></i></button>'}
+          <button class="btn-icon btn-icon--danger" data-action="delete-review" title="Excluir"><i class="fa-solid fa-trash"></i></button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function loadReviews() {
+    return DataService.Reviews.getAllAdmin().then(renderReviewsTable).catch((err) => Utils.showToast(err.message, 'error'));
+  }
+
+  function renderAuditTable(entries) {
+    const tbody = document.getElementById('admin-audit-tbody');
+    if (!tbody) return;
+    if (!entries.length) {
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">Nenhuma alteração registrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = entries.map((entry) => `
+      <tr>
+        <td>${Utils.escapeHtml(entry.date)}</td>
+        <td>${Utils.escapeHtml(entry.adminName || 'Administrador')}</td>
+        <td>${Utils.escapeHtml(entry.action)}</td>
+        <td>${Utils.escapeHtml(entry.entityType)}${entry.entityId ? ` · ${Utils.escapeHtml(entry.entityId)}` : ''}</td>
+        <td class="cell-truncate" title="${Utils.escapeHtml(entry.details || '')}">${Utils.escapeHtml(entry.details || '—')}</td>
+      </tr>`).join('');
+  }
+
+  function loadAudit() {
+    return DataService.Audit.getAll().then(renderAuditTable).catch((err) => Utils.showToast(err.message, 'error'));
+  }
+
+  // ==========================================================================
+  // PERSONALIZAR (banner, seleção, destaque, FAQ, frete e rodapé)
+  // ==========================================================================
+  let siteCarouselSlides = []; // [{ image, alt, eyebrow, title, subtitle, ctaText, ctaTarget }]
   let siteFaqItems = []; // [{ q, a }]
-  let siteAboutImage = null;
   let siteSpotlightImage = null;
 
   function updateSingleImagePreview(previewId, imageUrl) {
@@ -393,6 +446,15 @@
           </div>
           <div class="repeatable-row__fields">
             <input type="text" placeholder="Texto alternativo (descrição da imagem)" value="${Utils.escapeHtml(slide.alt || '')}" data-carousel-alt="${i}">
+            <input type="text" placeholder="Selo pequeno" value="${Utils.escapeHtml(slide.eyebrow || '')}" data-carousel-field="eyebrow" data-carousel-index="${i}">
+            <textarea rows="2" placeholder="Título do banner" data-carousel-field="title" data-carousel-index="${i}">${Utils.escapeHtml(slide.title || '')}</textarea>
+            <textarea rows="2" placeholder="Frase de apoio" data-carousel-field="subtitle" data-carousel-index="${i}">${Utils.escapeHtml(slide.subtitle || '')}</textarea>
+            <input type="text" placeholder="Texto do botão" value="${Utils.escapeHtml(slide.ctaText || '')}" data-carousel-field="ctaText" data-carousel-index="${i}">
+            <select aria-label="Destino do botão" data-carousel-field="ctaTarget" data-carousel-index="${i}">
+              <option value="catalog" ${slide.ctaTarget === 'catalog' || !slide.ctaTarget ? 'selected' : ''}>Destino: catálogo</option>
+              <option value="categories" ${slide.ctaTarget === 'categories' ? 'selected' : ''}>Destino: categorias</option>
+              <option value="selection" ${slide.ctaTarget === 'selection' ? 'selected' : ''}>Destino: seleção especial</option>
+            </select>
           </div>
           <button type="button" class="btn-icon btn-icon--danger" data-carousel-remove="${i}" title="Remover slide">
             <i class="fa-solid fa-trash"></i>
@@ -415,6 +477,12 @@
     container.querySelectorAll('[data-carousel-alt]').forEach((input) => {
       input.addEventListener('input', (e) => {
         siteCarouselSlides[parseInt(input.dataset.carouselAlt, 10)].alt = e.target.value;
+      });
+    });
+    container.querySelectorAll('[data-carousel-field]').forEach((field) => {
+      field.addEventListener('input', (e) => {
+        const index = parseInt(field.dataset.carouselIndex, 10);
+        siteCarouselSlides[index][field.dataset.carouselField] = e.target.value;
       });
     });
     container.querySelectorAll('[data-carousel-remove]').forEach((btn) => {
@@ -472,24 +540,23 @@
     if (!form) return;
 
     return DataService.SiteContent.getAdmin().then((content) => {
-      form.elements['theme-bg'].value = content.theme.bg || '#150A10';
-      form.elements['theme-surface'].value = content.theme.surface || '#211019';
-      form.elements['theme-primary'].value = content.theme.primary || '#FF3D82';
-      form.elements['theme-primary-dark'].value = content.theme.primaryDark || '#C81760';
-      form.elements['theme-accent'].value = content.theme.accent || '#FF3B4E';
-      form.elements['theme-accent-dark'].value = content.theme.accentDark || '#C4172A';
-      form.elements['theme-text'].value = content.theme.text || '#F5EBEF';
-      form.elements['theme-text-muted'].value = content.theme.textMuted || '#B49AA8';
-      form.elements['theme-dark'].value = content.theme.dark || '#0B0509';
+      form.elements['theme-bg'].value = content.theme.bg || '#1A1A1A';
+      form.elements['theme-surface'].value = content.theme.surface || '#242424';
+      form.elements['theme-primary'].value = content.theme.primary || '#B91E1F';
+      form.elements['theme-primary-dark'].value = content.theme.primaryDark || '#8F1517';
+      form.elements['theme-accent'].value = content.theme.accent || '#D99163';
+      form.elements['theme-accent-dark'].value = content.theme.accentDark || '#A8673F';
+      form.elements['theme-text'].value = content.theme.text || '#FDFCFA';
+      form.elements['theme-text-muted'].value = content.theme.textMuted || '#D4C9C2';
+      form.elements['theme-dark'].value = content.theme.dark || '#101010';
 
       form.elements['pix-chave'].value = (content.pix && content.pix.chave) || '';
       form.elements['pix-nome'].value = (content.pix && content.pix.nomeBeneficiario) || '';
       form.elements['pix-cidade'].value = (content.pix && content.pix.cidadeBeneficiario) || '';
 
-      form.elements['hero-eyebrow'].value = content.hero.eyebrow || '';
-      form.elements['hero-title'].value = content.hero.title || '';
-      form.elements['hero-subtitle'].value = content.hero.subtitle || '';
-      form.elements['hero-cta'].value = content.hero.ctaText || '';
+      form.elements['shipping-flat'].value = (content.shipping && content.shipping.flatRate) || 0;
+      form.elements['shipping-free-above'].value = (content.shipping && content.shipping.freeAbove) || 0;
+      form.elements['shipping-days'].value = (content.shipping && content.shipping.estimatedDays) || 7;
 
       siteCarouselSlides = (content.carousel || []).map((s) => Object.assign({}, s));
       renderCarouselRows();
@@ -497,14 +564,6 @@
       form.elements['flash-tag'].value = content.flashSale.tag || '';
       form.elements['flash-title'].value = content.flashSale.title || '';
       form.elements['flash-description'].value = content.flashSale.description || '';
-
-      siteAboutImage = content.about.image || null;
-      updateSingleImagePreview('sc-about-image-preview', siteAboutImage);
-      form.elements['about-eyebrow'].value = content.about.eyebrow || '';
-      form.elements['about-title'].value = content.about.title || '';
-      form.elements['about-p1'].value = content.about.paragraph1 || '';
-      form.elements['about-p2'].value = content.about.paragraph2 || '';
-      form.elements['about-bullets'].value = (content.about.bullets || []).join('\n');
 
       siteSpotlightImage = content.spotlight.image || null;
       updateSingleImagePreview('sc-spotlight-image-preview', siteSpotlightImage);
@@ -517,6 +576,9 @@
       renderFaqRows();
 
       form.elements['footer-about'].value = content.footer.about || '';
+      form.elements['footer-legal-name'].value = content.footer.legalName || '';
+      form.elements['footer-document'].value = content.footer.document || '';
+      form.elements['footer-address'].value = content.footer.address || '';
       form.elements['footer-phone'].value = content.footer.phone || '';
       form.elements['footer-email'].value = content.footer.email || '';
       form.elements['footer-hours1'].value = content.footer.hours1 || '';
@@ -546,28 +608,16 @@
         nomeBeneficiario: form.elements['pix-nome'].value.trim(),
         cidadeBeneficiario: form.elements['pix-cidade'].value.trim()
       },
-      hero: {
-        eyebrow: form.elements['hero-eyebrow'].value.trim(),
-        title: form.elements['hero-title'].value,
-        subtitle: form.elements['hero-subtitle'].value.trim(),
-        ctaText: form.elements['hero-cta'].value.trim() || 'Ver produtos'
+      shipping: {
+        flatRate: parseFloat(form.elements['shipping-flat'].value) || 0,
+        freeAbove: parseFloat(form.elements['shipping-free-above'].value) || 0,
+        estimatedDays: parseInt(form.elements['shipping-days'].value, 10) || 7
       },
       carousel: siteCarouselSlides.filter((s) => s.image),
       flashSale: {
         tag: form.elements['flash-tag'].value.trim(),
         title: form.elements['flash-title'].value.trim(),
         description: form.elements['flash-description'].value.trim()
-      },
-      about: {
-        image: siteAboutImage,
-        eyebrow: form.elements['about-eyebrow'].value.trim(),
-        title: form.elements['about-title'].value.trim(),
-        paragraph1: form.elements['about-p1'].value.trim(),
-        paragraph2: form.elements['about-p2'].value.trim(),
-        bullets: form.elements['about-bullets'].value
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean)
       },
       spotlight: {
         image: siteSpotlightImage,
@@ -579,6 +629,9 @@
       faq: siteFaqItems.filter((f) => f.q && f.a),
       footer: {
         about: form.elements['footer-about'].value.trim(),
+        legalName: form.elements['footer-legal-name'].value.trim(),
+        document: form.elements['footer-document'].value.trim(),
+        address: form.elements['footer-address'].value.trim(),
         phone: form.elements['footer-phone'].value.trim(),
         email: form.elements['footer-email'].value.trim(),
         hours1: form.elements['footer-hours1'].value.trim(),
@@ -593,12 +646,12 @@
         Utils.showToast('Personalização salva! Já está valendo na loja.', 'success');
         if (global.SiteContentModule) global.SiteContentModule.render(true);
       })
-      .catch(() => Utils.showToast('Não foi possível salvar. Tente novamente.', 'error'))
+      .catch((err) => Utils.showToast(err.message || 'Não foi possível salvar. Tente novamente.', 'error'))
       .finally(() => submitBtns.forEach((btn) => (btn.disabled = false)));
   }
 
   function handleSiteContentReset() {
-    if (!confirm('Restaurar todos os textos e imagens da loja para o padrão original? Isso substitui suas personalizações atuais.')) return;
+    if (!confirm('Restaurar textos, imagens, tema e frete para o padrão? A chave Pix e os dados de identificação legal serão preservados.')) return;
     DataService.SiteContent.resetDefaults().then(() => {
       Utils.showToast('Personalização restaurada ao padrão.', 'info');
       if (global.SiteContentModule) global.SiteContentModule.render(true);
@@ -616,7 +669,11 @@
     const addSlideBtn = document.getElementById('sc-carousel-add');
     if (addSlideBtn) {
       addSlideBtn.addEventListener('click', () => {
-        siteCarouselSlides.push({ image: '', alt: '' });
+        if (siteCarouselSlides.length >= 4) {
+          Utils.showToast('O banner aceita no máximo 4 slides.', 'warning');
+          return;
+        }
+        siteCarouselSlides.push({ image: '', alt: '', eyebrow: '', title: '', subtitle: '', ctaText: 'Ver catálogo', ctaTarget: 'catalog' });
         renderCarouselRows();
       });
     }
@@ -626,18 +683,6 @@
       addFaqBtn.addEventListener('click', () => {
         siteFaqItems.push({ q: '', a: '' });
         renderFaqRows();
-      });
-    }
-
-    const aboutImageInput = document.getElementById('sc-about-image-input');
-    if (aboutImageInput) {
-      aboutImageInput.addEventListener('change', (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        Utils.compressImageFile(file).then((imageData) => {
-          siteAboutImage = imageData;
-          updateSingleImagePreview('sc-about-image-preview', siteAboutImage);
-        }).catch((err) => Utils.showToast(err.message, 'error'));
       });
     }
 
@@ -664,6 +709,15 @@
     document.querySelectorAll('[data-admin-tab]').forEach((btn) => {
       btn.classList.toggle('is-active', btn.dataset.adminTab === tabName);
     });
+    const titles = {
+      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos',
+      relatorios: 'Relatórios', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
+    };
+    const title = document.getElementById('admin-topbar-title');
+    if (title) title.textContent = titles[tabName] || 'Painel Administrativo';
+    if (tabName === 'avaliacoes') loadReviews();
+    if (tabName === 'auditoria') loadAudit();
+    if (tabName === 'relatorios' && global.AdminReportsModule) global.AdminReportsModule.onAdminTabActivated();
   }
 
   // ==========================================================================
@@ -708,27 +762,58 @@
   // CARREGAMENTO GERAL
   // ==========================================================================
   function loadAll() {
-    return Promise.all([DataService.Orders.getAll(), DataService.Customers.getAll()]).then(
-      ([orders, customers]) => {
+    return Promise.all([
+      DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0 }),
+      DataService.Customers.getAll({ limit: PAGE_SIZE, offset: 0 }),
+      DataService.Orders.getAdminSummary()
+    ]).then(
+      ([orders, customers, summary]) => {
+        cachedOrders = orders;
         cachedCustomers = customers;
         checkForNewOrders(orders);
-        renderDashboard(orders, customers);
-        renderCustomersTable(customers);
-        renderOrdersTable(orders);
+        renderDashboard(summary);
+        renderCustomersTable(cachedCustomers);
+        renderOrdersTable(cachedOrders);
+        document.getElementById('admin-orders-load-more')?.classList.toggle('is-hidden', orders.length < PAGE_SIZE);
+        document.getElementById('admin-customers-load-more')?.classList.toggle('is-hidden', customers.length < PAGE_SIZE);
       }
     ).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
   function loadOrdersOnly() {
-    return DataService.Orders.getAll().then((orders) => {
+    return Promise.all([DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0 }), DataService.Orders.getAdminSummary()]).then(([orders, summary]) => {
       checkForNewOrders(orders);
-      renderDashboard(orders, cachedCustomers);
-      renderOrdersTable(orders);
+      const merged = new Map([...orders, ...cachedOrders].map((order) => [order.id, order]));
+      cachedOrders = Array.from(merged.values()).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      renderDashboard(summary);
+      renderOrdersTable(cachedOrders);
     }).catch(() => {});
   }
 
+  function loadMoreOrders() {
+    const button = document.getElementById('admin-orders-load-more');
+    if (button) button.disabled = true;
+    return DataService.Orders.getAll({ limit: PAGE_SIZE, offset: cachedOrders.length }).then((orders) => {
+      const known = new Set(cachedOrders.map((order) => order.id));
+      cachedOrders.push(...orders.filter((order) => !known.has(order.id)));
+      renderOrdersTable(cachedOrders);
+      if (button) button.classList.toggle('is-hidden', orders.length < PAGE_SIZE);
+    }).catch((err) => Utils.showToast(err.message, 'error')).finally(() => { if (button) button.disabled = false; });
+  }
+
+  function loadMoreCustomers() {
+    const button = document.getElementById('admin-customers-load-more');
+    if (button) button.disabled = true;
+    return DataService.Customers.getAll({ limit: PAGE_SIZE, offset: cachedCustomers.length }).then((customers) => {
+      const known = new Set(cachedCustomers.map((customer) => customer.id));
+      cachedCustomers.push(...customers.filter((customer) => !known.has(customer.id)));
+      renderCustomersTable(cachedCustomers);
+      if (button) button.classList.toggle('is-hidden', customers.length < PAGE_SIZE);
+    }).catch((err) => Utils.showToast(err.message, 'error')).finally(() => { if (button) button.disabled = false; });
+  }
+
   function enter() {
-    return Promise.all([loadAll(), loadProducts(), loadSiteContentForm()]);
+    return Promise.all([loadAll(), loadProducts(), loadSiteContentForm(), loadReviews(), loadAudit()]);
   }
 
   function startPolling() {
@@ -776,8 +861,34 @@
       });
     }
 
+    const reviewsTbody = document.getElementById('admin-reviews-tbody');
+    if (reviewsTbody) {
+      reviewsTbody.addEventListener('click', (e) => {
+        const row = e.target.closest('tr[data-id]');
+        if (!row) return;
+        if (e.target.closest('[data-action="approve-review"]')) {
+          DataService.Reviews.approve(row.dataset.id).then(() => {
+            Utils.showToast('Avaliação aprovada e publicada.', 'success');
+            loadReviews();
+            loadAudit();
+          }).catch((err) => Utils.showToast(err.message, 'error'));
+        }
+        if (e.target.closest('[data-action="delete-review"]')) {
+          if (!confirm('Excluir esta avaliação definitivamente?')) return;
+          DataService.Reviews.remove(row.dataset.id).then(() => {
+            Utils.showToast('Avaliação excluída.', 'info');
+            loadReviews();
+            loadAudit();
+          }).catch((err) => Utils.showToast(err.message, 'error'));
+        }
+      });
+    }
+
     const newProductBtn = document.getElementById('new-product-btn');
     if (newProductBtn) newProductBtn.addEventListener('click', () => openProductForm(null));
+
+    document.getElementById('admin-orders-load-more')?.addEventListener('click', loadMoreOrders);
+    document.getElementById('admin-customers-load-more')?.addEventListener('click', loadMoreCustomers);
 
     const productForm = document.getElementById('form-product');
     if (productForm) productForm.addEventListener('submit', handleProductFormSubmit);
@@ -815,6 +926,7 @@
   }
 
   function init() {
+    if (global.AdminReportsModule) global.AdminReportsModule.init();
     wireEvents();
     wireSiteContentForm();
     switchTab('dashboard');

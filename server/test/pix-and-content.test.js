@@ -30,4 +30,6 @@ test('restaura campos ausentes do conteúdo sem apagar personalizações', () =>
   assert.equal(merged.hero.title, 'Minha loja');
   assert.equal(merged.hero.ctaText, SITE_CONTENT_DEFAULTS.hero.ctaText);
   assert.ok(Array.isArray(merged.faq));
+  assert.equal(merged.shipping.estimatedDays, 7);
+  assert.ok(merged.carousel.every((slide) => slide.title && slide.ctaText && slide.ctaTarget));
 });

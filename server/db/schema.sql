@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
   city          text,
   state         text,
   zip           text,
+  adult_confirmed_at timestamptz,
   token_version integer NOT NULL DEFAULT 0,
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now()
@@ -30,6 +31,9 @@ CREATE TABLE IF NOT EXISTS users (
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version integer NOT NULL DEFAULT 0;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE users ADD COLUMN IF NOT EXISTS adult_confirmed_at timestamptz;
+-- O CPF não é necessário no fluxo atual e deixa de ser retido.
+UPDATE users SET cpf = NULL WHERE cpf IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower ON users (lower(email));
 
 -- ----------------------------------------------------------------------------
@@ -40,9 +44,10 @@ CREATE TABLE IF NOT EXISTS products (
   name        text NOT NULL,
   description text NOT NULL DEFAULT '',
   price       numeric(10, 2) NOT NULL DEFAULT 0,
+  compare_at_price numeric(10, 2),
   category    text NOT NULL DEFAULT 'Geral',
   icon        text NOT NULL DEFAULT '🛍️',
-  color       text NOT NULL DEFAULT '#FF3D82',
+  color       text NOT NULL DEFAULT '#D99163',
   stock       integer NOT NULL DEFAULT 0,
   active      boolean NOT NULL DEFAULT true,
   image       text,
@@ -53,6 +58,23 @@ CREATE TABLE IF NOT EXISTS products (
 );
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price numeric(10, 2);
+DO $$
+BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_price_positive CHECK (price > 0) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_stock_nonnegative CHECK (stock >= 0) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_compare_price_valid
+    CHECK (compare_at_price IS NULL OR compare_at_price > price) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_products_active_category ON products(active, category);
 
 -- Sequência usada para gerar o número de pedido (ex: 000123).
@@ -82,6 +104,8 @@ CREATE TABLE IF NOT EXISTS orders (
   idempotency_key text,
   payment_reported_at timestamptz,
   stock_restored boolean NOT NULL DEFAULT false,
+  expires_at     timestamptz,
+  cancel_reason  text,
   order_date     text,
   order_time     text,
   created_at     timestamptz NOT NULL DEFAULT now(),
@@ -99,11 +123,43 @@ ALTER TABLE orders ADD COLUMN IF NOT EXISTS idempotency_key text;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_reported_at timestamptz;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS stock_restored boolean NOT NULL DEFAULT false;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS expires_at timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason text;
+DO $$
+BEGIN
+  ALTER TABLE orders ADD CONSTRAINT orders_money_nonnegative
+    CHECK (subtotal >= 0 AND shipping_total >= 0 AND total >= 0) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+DO $$
+BEGIN
+  ALTER TABLE orders ADD CONSTRAINT orders_status_valid CHECK (status IN (
+    'Aguardando Pagamento', 'Aguardando Confirmação', 'Pago',
+    'Em Produção', 'Enviado', 'Finalizado', 'Cancelado'
+  )) NOT VALID;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+UPDATE orders SET expires_at = created_at + interval '30 minutes'
+WHERE status='Aguardando Pagamento' AND expires_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_orders_reporting ON orders(created_at DESC, status, user_id);
+CREATE INDEX IF NOT EXISTS idx_orders_items_gin ON orders USING gin(items jsonb_path_ops);
+CREATE INDEX IF NOT EXISTS idx_orders_payment_expiry ON orders(expires_at)
+  WHERE status = 'Aguardando Pagamento' AND stock_restored = false;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_user_idempotency
   ON orders(user_id, idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+SELECT setval(
+  'order_number_seq',
+  GREATEST(
+    (SELECT last_value FROM order_number_seq),
+    COALESCE((SELECT MAX(number::bigint) FROM orders WHERE number ~ '^[0-9]+$'), 1)
+  ),
+  (SELECT is_called FROM order_number_seq)
+    OR EXISTS (SELECT 1 FROM orders WHERE number ~ '^[0-9]+$')
+);
 
 -- ----------------------------------------------------------------------------
 -- Avaliações de produtos
@@ -116,7 +172,7 @@ CREATE TABLE IF NOT EXISTS reviews (
   rating       integer NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment      text NOT NULL DEFAULT '',
   verified_purchase boolean NOT NULL DEFAULT false,
-  approved     boolean NOT NULL DEFAULT true,
+  approved     boolean NOT NULL DEFAULT false,
   created_at   timestamptz NOT NULL DEFAULT now(),
   updated_at   timestamptz NOT NULL DEFAULT now()
 );
@@ -125,6 +181,12 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES users(id) O
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS verified_purchase boolean NOT NULL DEFAULT false;
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS approved boolean NOT NULL DEFAULT true;
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE reviews ALTER COLUMN approved SET DEFAULT false;
+-- Nenhuma identificação pessoal antiga permanece visível no catálogo.
+UPDATE reviews SET author_name = CASE
+  WHEN verified_purchase = true OR user_id IS NOT NULL THEN 'Cliente verificado'
+  ELSE 'Cliente'
+END;
 
 CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_reviews_one_per_user_product
@@ -140,3 +202,18 @@ CREATE TABLE IF NOT EXISTS site_content (
   content    jsonb NOT NULL DEFAULT '{}'::jsonb,
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ----------------------------------------------------------------------------
+-- Auditoria administrativa
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+  id          bigserial PRIMARY KEY,
+  admin_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+  action      text NOT NULL,
+  entity_type text NOT NULL,
+  entity_id   text,
+  details     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_audit_created_at ON admin_audit_logs(created_at DESC);

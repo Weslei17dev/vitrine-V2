@@ -60,25 +60,6 @@ function state(value) {
   return normalized;
 }
 
-function isValidCpf(value) {
-  const cpf = digits(value);
-  if (!cpf) return true;
-  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-  const calc = (length) => {
-    let sum = 0;
-    for (let i = 0; i < length; i += 1) sum += Number(cpf[i]) * (length + 1 - i);
-    const remainder = (sum * 10) % 11;
-    return remainder === 10 ? 0 : remainder;
-  };
-  return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
-}
-
-function cpf(value) {
-  const normalized = digits(value);
-  if (normalized && !isValidCpf(normalized)) throw new ValidationError('Informe um CPF válido.');
-  return normalized || null;
-}
-
 function uuid(value, label = 'Identificador') {
   const normalized = String(value || '').toLowerCase();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)) {
@@ -111,6 +92,26 @@ function positiveMoney(value, label = 'Preço') {
   return Math.round(number * 100) / 100;
 }
 
+function nonNegativeMoney(value, label = 'Valor') {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0 || number > 99999999.99) {
+    throw new ValidationError(`${label} inválido.`);
+  }
+  return Math.round(number * 100) / 100;
+}
+
+function optionalMoney(value, label = 'Valor') {
+  if (value == null || value === '') return null;
+  return positiveMoney(value, label);
+}
+
+function timestamp(value, label = 'Data de atualização') {
+  const normalized = String(value || '');
+  const date = new Date(normalized);
+  if (!normalized || Number.isNaN(date.getTime())) throw new ValidationError(`${label} inválida.`);
+  return date.toISOString();
+}
+
 function color(value) {
   const normalized = String(value || '').trim();
   if (!/^#[0-9a-fA-F]{6}$/.test(normalized)) throw new ValidationError('Cor inválida.');
@@ -136,11 +137,13 @@ module.exports = {
   phone,
   zip,
   state,
-  cpf,
   uuid,
   positiveInteger,
   nonNegativeInteger,
   positiveMoney,
+  nonNegativeMoney,
+  optionalMoney,
+  timestamp,
   color,
   imageSource
 };

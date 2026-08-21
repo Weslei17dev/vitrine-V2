@@ -1,8 +1,7 @@
 /* ============================================================================
    pixPayload.js (servidor)
    ----------------------------------------------------------------------------
-   Mesma lógica de js/pixPayload.js do front-end, em CommonJS, usada para
-   gerar o código Pix "Copia e Cola" (padrão EMV do Banco Central) no momento
+   Gera o código Pix "Copia e Cola" (padrão EMV do Banco Central) no momento
    em que um pedido é criado — usando a chave configurada em site_content.
    ============================================================================ */
 

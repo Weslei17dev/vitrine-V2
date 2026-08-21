@@ -22,6 +22,10 @@ services:
         value: brincar-de-desejo-web
       - key: JWT_EXPIRES_IN
         value: 2h
+      - key: ORDER_PAYMENT_TTL_MINUTES
+        value: "30"
+      - key: MAX_OPEN_ORDERS_PER_USER
+        value: "3"
       - key: ALLOWED_ORIGINS
         sync: false
       - key: ADMIN_EMAIL

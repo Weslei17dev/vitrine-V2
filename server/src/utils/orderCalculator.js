@@ -28,6 +28,9 @@ function calculateOrder(requestedItems, productRows, shippingCents = 0) {
     };
   });
   if (!Number.isSafeInteger(shippingCents) || shippingCents < 0) throw new ValidationError('Frete inválido.');
+  if (subtotalCents + shippingCents > 9999999999) {
+    throw new ValidationError('O valor total do pedido ultrapassa o limite permitido.');
+  }
   return {
     items,
     subtotalCents,

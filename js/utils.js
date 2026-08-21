@@ -20,9 +20,8 @@
   }
 
   function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = String(str ?? '');
-    return div.innerHTML;
+    const entities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return String(str ?? '').replace(/[&<>"']/g, (character) => entities[character]);
   }
 
   function safeImageSrc(value) {
@@ -30,13 +29,13 @@
     const source = String(value).trim();
     const isHttps = /^https:\/\/[^\s]+$/i.test(source);
     const isLocal = /^img\/[A-Za-z0-9._/-]+$/.test(source) && !source.includes('..');
-    const isDataImage = /^data:image\/(?:png|jpeg|webp|gif);base64,/i.test(source);
+    const isDataImage = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/i.test(source);
     return isHttps || isLocal || isDataImage ? source : '';
   }
 
   function safeColor(value) {
     const color = String(value || '');
-    return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#FF3D82';
+    return /^#[0-9a-fA-F]{6}$/.test(color) ? color : '#D99163';
   }
 
   function compressImageFile(file, options = {}) {
@@ -63,7 +62,7 @@
           const context = canvas.getContext('2d');
           context.drawImage(image, 0, 0, canvas.width, canvas.height);
           const result = canvas.toDataURL('image/webp', quality);
-          if (result.length > 400000) return reject(new Error('A imagem continua muito grande após a otimização. Use uma imagem menor.'));
+          if (result.length > 300000) return reject(new Error('A imagem continua muito grande após a otimização. Use uma imagem menor ou mais simples.'));
           resolve(result);
         };
         image.src = reader.result;
@@ -78,15 +77,6 @@
       .replace(/(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{5})(\d)/, '$1-$2')
       .slice(0, 15);
-  }
-
-  function maskCpf(value) {
-    return value
-      .replace(/\D/g, '')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})$/, '$1-$2')
-      .slice(0, 14);
   }
 
   function maskCep(value) {
@@ -276,7 +266,6 @@
     safeColor,
     compressImageFile,
     maskPhone,
-    maskCpf,
     maskCep,
     statusMeta,
     statusBadgeHtml,

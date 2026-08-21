@@ -23,9 +23,19 @@
   };
 
   const API_BASE_URL = (global.API_BASE_URL || '').replace(/\/$/, '');
+  const REQUEST_TIMEOUT_MS = 20000;
+
+  class ApiError extends Error {
+    constructor(message, status, code) {
+      super(message);
+      this.name = 'ApiError';
+      this.status = status;
+      this.code = code || null;
+    }
+  }
 
   // --------------------------------------------------------------------------
-  // Helpers de storage local (usados só pela sessão e pelo carrinho)
+  // Helpers de storage do navegador (sessão temporária e carrinho local)
   // --------------------------------------------------------------------------
   function readJSON(storage, key, fallback) {
     try {
@@ -65,18 +75,25 @@
     const token = getToken();
     if (token) opts.headers.Authorization = `Bearer ${token}`;
 
-    return fetch(API_BASE_URL + path, opts).then((response) =>
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    opts.signal = controller.signal;
+
+    return fetch(API_BASE_URL + path, opts).catch((err) => {
+      if (err && err.name === 'AbortError') throw new ApiError('A API demorou para responder. Tente novamente.', 0, 'timeout');
+      throw new ApiError('Não foi possível conectar à API. Verifique sua internet e tente novamente.', 0, 'network_error');
+    }).then((response) =>
       response.json().catch(() => ({})).then((body) => {
         if (!response.ok) {
-          if (response.status === 401) {
+          if (response.status === 401 && token && path !== '/api/auth/login') {
             sessionStorage.removeItem(STORAGE_KEYS.SESSION);
             global.dispatchEvent(new CustomEvent('vitrine:session-expired'));
           }
-          throw new Error(body.message || 'Não foi possível completar a operação. Tente novamente.');
+          throw new ApiError(body.message || 'Não foi possível completar a operação. Tente novamente.', response.status, body.code);
         }
         return body;
       })
-    );
+    ).finally(() => clearTimeout(timeout));
   }
 
   // ============================================================================
@@ -123,9 +140,12 @@
           writeJSON(sessionStorage, STORAGE_KEYS.SESSION, { token: session.token, user });
           return user;
         })
-        .catch(() => {
-          sessionStorage.removeItem(STORAGE_KEYS.SESSION);
-          return null;
+        .catch((err) => {
+          if (err.status === 401) {
+            sessionStorage.removeItem(STORAGE_KEYS.SESSION);
+            return null;
+          }
+          return session.user;
         });
     },
 
@@ -220,8 +240,16 @@
         body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })) })
       });
     },
-    getAll() {
-      return apiFetch('/api/orders');
+    quote(items) {
+      return apiFetch('/api/orders/quote', {
+        method: 'POST',
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })) })
+      });
+    },
+    getAll(options = {}) {
+      const limit = Number(options.limit) || 100;
+      const offset = Number(options.offset) || 0;
+      return apiFetch(`/api/orders?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`);
     },
     getByUser(userId) {
       return apiFetch(`/api/orders/user/${userId}`);
@@ -229,11 +257,17 @@
     getById(orderId) {
       return apiFetch(`/api/orders/${orderId}`);
     },
+    getAdminSummary() {
+      return apiFetch('/api/orders/admin/summary');
+    },
     updateStatus(orderId, status) {
       return apiFetch(`/api/orders/${orderId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
     },
     markPaymentReported(orderId) {
       return apiFetch(`/api/orders/${orderId}/payment-reported`, { method: 'PATCH' });
+    },
+    cancel(orderId) {
+      return apiFetch(`/api/orders/${orderId}/cancel`, { method: 'PATCH' });
     },
     markSeenByAdmin(orderId) {
       return apiFetch(`/api/orders/${orderId}/seen`, { method: 'PATCH' });
@@ -244,8 +278,10 @@
   // REPOSITÓRIO: Clientes (painel admin)
   // ============================================================================
   const CustomerRepository = {
-    getAll() {
-      return apiFetch('/api/customers');
+    getAll(options = {}) {
+      const limit = Number(options.limit) || 100;
+      const offset = Number(options.offset) || 0;
+      return apiFetch(`/api/customers?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`);
     }
   };
 
@@ -254,10 +290,11 @@
   // ============================================================================
   const SITE_CONTENT_DEFAULTS = {
     theme: {
-      bg: '#150A10', surface: '#211019', primary: '#FF3D82', primaryDark: '#C81760',
-      accent: '#FF3B4E', accentDark: '#C4172A', text: '#F5EBEF', textMuted: '#B49AA8', dark: '#0B0509'
+      bg: '#1A1A1A', surface: '#242424', primary: '#B91E1F', primaryDark: '#8F1517',
+      accent: '#D99163', accentDark: '#A8673F', text: '#FDFCFA', textMuted: '#D4C9C2', dark: '#101010'
     },
     pix: { chave: '', nomeBeneficiario: '', cidadeBeneficiario: '' },
+    shipping: { flatRate: 0, freeAbove: 0, estimatedDays: 7 },
     hero: {
       eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
       title: 'Desejo, prazer e sedução\nem um só lugar.',
@@ -265,9 +302,21 @@
       ctaText: 'Ver produtos'
     },
     carousel: [
-      { image: 'img/promo-dessensibilizante.jpg', alt: 'Dessensibilizante — conforto é prioridade para iniciantes ou amadores' },
-      { image: 'img/promo-bdsm.jpg', alt: 'BDSM — fetiches escondidos' },
-      { image: 'img/promo-acessorios.jpg', alt: 'Acessórios para momentos especiais' }
+      {
+        image: 'img/promo-dessensibilizante.jpg', alt: 'Seleção de produtos voltada a conforto e cuidado',
+        eyebrow: 'Conforto em primeiro lugar', title: 'Descobertas mais leves,\nno seu ritmo.',
+        subtitle: 'Conheça opções selecionadas para começar com informação, cuidado e tranquilidade.', ctaText: 'Explorar catálogo', ctaTarget: 'catalog'
+      },
+      {
+        image: 'img/promo-bdsm.jpg', alt: 'Acessórios para explorar fantasias com responsabilidade',
+        eyebrow: 'Confiança e consentimento', title: 'Explore novos desejos\ncom responsabilidade.',
+        subtitle: 'Informação clara, limites respeitados e produtos para diferentes experiências.', ctaText: 'Ver categorias', ctaTarget: 'categories'
+      },
+      {
+        image: 'img/promo-acessorios.jpg', alt: 'Acessórios para diferentes momentos',
+        eyebrow: 'Escolhas para cada momento', title: 'Detalhes que transformam\na experiência.',
+        subtitle: 'Uma curadoria discreta para descobrir possibilidades a sós ou a dois.', ctaText: 'Conhecer seleção', ctaTarget: 'selection'
+      }
     ],
     flashSale: {
       tag: 'Seleção Especial', title: 'Descubra os favoritos da loja',
@@ -281,9 +330,9 @@
       bullets: ['Produtos testados e aprovados', 'Atendimento humano e sem julgamentos', 'Compromisso com a sua privacidade']
     },
     spotlight: {
-      image: 'img/promo-dessensibilizante.jpg', eyebrow: 'Mais vendido da semana',
-      title: 'Dessensibilizante — conforto é prioridade',
-      text: 'Pensado para iniciantes ou amadores, prolonga o prazer com uma fórmula suave que não tira a sensibilidade. Aplicação simples e absorção rápida, para uma experiência mais confortável a dois.',
+      image: 'img/promo-dessensibilizante.jpg', eyebrow: 'Destaque da semana',
+      title: 'Conforto e cuidado em primeiro lugar',
+      text: 'Conheça uma seleção pensada para proporcionar experiências mais confortáveis, com informações claras para ajudar na escolha.',
       buttonText: 'Ver produtos relacionados'
     },
     faq: [
@@ -291,11 +340,12 @@
       { q: 'Preciso criar conta para ver os produtos?', a: 'Não. Você pode navegar por todo o catálogo, buscar e filtrar produtos livremente sem login. A conta só é pedida na hora de finalizar o pedido.' },
       { q: 'Quais formas de pagamento vocês aceitam?', a: 'O pagamento disponível no site é PIX. A confirmação é realizada pela equipe após a conferência do recebimento.' },
       { q: 'Como acompanho meu pedido?', a: 'Acesse Meus Pedidos para consultar o status informado pela equipe.' },
-      { q: 'Posso trocar ou devolver um produto?', a: 'Sim, seguindo nossa política de trocas e devoluções. Entre em contato com a Central de Atendimento informando o número do seu pedido.' },
+      { q: 'Posso trocar ou devolver um produto?', a: 'A solicitação é analisada conforme o tipo de produto, a integridade do lacre e as regras aplicáveis. Use o e-mail do rodapé e informe o número do pedido.' },
       { q: 'Como meus dados são utilizados?', a: 'Os dados são utilizados para manter sua conta, processar o pedido, realizar a entrega e prestar atendimento.' }
     ],
     footer: {
-      about: 'Loja online de produtos eróticos com atendimento humano, embalagem discreta e entrega para todo o Brasil.',
+      about: 'Loja online de bem-estar íntimo para adultos, com pagamento via PIX e envio discreto.',
+      legalName: '', document: '', address: '',
       phone: '(11) 4810-6810', email: 'sac@brincardedesejo.com.br',
       hours1: 'Seg. a Sex. das 8h às 18h', hours2: 'Sábados das 8h às 12h'
     }
@@ -325,6 +375,37 @@
     },
     create({ productId, rating, comment }) {
       return apiFetch('/api/reviews', { method: 'POST', body: JSON.stringify({ productId, rating, comment }) });
+    },
+    getAllAdmin() {
+      return apiFetch('/api/reviews/admin/all');
+    },
+    approve(reviewId) {
+      return apiFetch(`/api/reviews/${reviewId}/approve`, { method: 'PATCH' });
+    },
+    remove(reviewId) {
+      return apiFetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
+    }
+  };
+
+  const AuditRepository = {
+    getAll() {
+      return apiFetch('/api/audit');
+    }
+  };
+
+  // ============================================================================
+  // REPOSITÓRIO: Relatórios gerenciais (somente administrador)
+  // ============================================================================
+  const ReportsRepository = {
+    getFilters() {
+      return apiFetch('/api/reports/filters');
+    },
+    get(filters = {}) {
+      const query = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== null && value !== undefined && value !== '') query.set(key, value);
+      });
+      return apiFetch(`/api/reports?${query.toString()}`);
     }
   };
 
@@ -339,6 +420,8 @@
     Customers: CustomerRepository,
     SiteContent: SiteContentRepository,
     Reviews: ReviewRepository,
+    Audit: AuditRepository,
+    Reports: ReportsRepository,
     SITE_CONTENT_DEFAULTS,
     KEYS: STORAGE_KEYS
   };
