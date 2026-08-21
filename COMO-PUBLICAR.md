@@ -137,3 +137,12 @@ Para próximas versões:
 4. executar testes;
 5. validar `/api/health`;
 6. realizar um pedido completo de teste.
+# Manter API e banco ativos
+
+No painel do Render, em **Environment**, configure também:
+
+```env
+KEEP_ALIVE_URL=https://SUA-API.onrender.com
+```
+
+Use a URL pública da API sem `/api/health` no final. A API enviará um pulso ao Neon a cada 4 minutos e fará uma chamada pública ao próprio serviço do Render a cada 10 minutos.

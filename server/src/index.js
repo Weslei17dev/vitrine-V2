@@ -14,6 +14,8 @@ const config = require('./config');
 const pool = require('./db');
 const { securityHeaders, globalLimiter } = require('./security');
 const { expirePendingOrders } = require('./utils/orderLifecycle');
+const { startNeonPulse } = require('./keepAlive/neonPulse');
+const { startRenderPulse } = require('./keepAlive/renderPulse');
 
 const app = express();
 app.disable('x-powered-by');
@@ -72,6 +74,9 @@ const server = app.listen(config.port, () => {
   console.log(`✅ API da Brincar de Desejo rodando na porta ${config.port}`);
 });
 
+const stopNeonPulse = startNeonPulse(pool);
+const stopRenderPulse = startRenderPulse();
+
 const expirationTimer = setInterval(() => {
   expirePendingOrders().catch((err) => console.error('[orders] Falha ao expirar reservas:', err.message));
 }, 60000);
@@ -80,6 +85,8 @@ expirationTimer.unref();
 async function shutdown(signal) {
   console.log(`${signal} recebido. Encerrando conexões...`);
   clearInterval(expirationTimer);
+  stopNeonPulse();
+  stopRenderPulse();
   server.close(async () => {
     await pool.end();
     process.exit(0);

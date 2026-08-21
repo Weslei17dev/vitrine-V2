@@ -12,6 +12,8 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
+      - key: KEEP_ALIVE_URL
+        sync: false
       - key: PG_SSL_REJECT_UNAUTHORIZED
         value: "true"
       - key: JWT_SECRET
