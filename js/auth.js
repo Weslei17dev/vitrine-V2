@@ -75,7 +75,7 @@
   // --------------------------------------------------------------------------
   function validateRegisterForm(form) {
     let valid = true;
-    const required = ['name', 'phone', 'email', 'password', 'address', 'city', 'state', 'zip'];
+    const required = ['name', 'phone', 'email', 'password'];
 
     required.forEach((fieldName) => {
       const input = form.elements[fieldName];
@@ -88,12 +88,6 @@
     const email = form.elements.email;
     if (email.value.trim() && !Utils.isValidEmail(email.value.trim())) {
       showFieldError(email, 'Informe um e-mail válido.');
-      valid = false;
-    }
-
-    const password = form.elements.password;
-    if (password.value && (password.value.length < 10 || !/[A-Za-zÀ-ÿ]/.test(password.value) || !/\d/.test(password.value))) {
-      showFieldError(password, 'Use pelo menos 10 caracteres, com letras e números.');
       valid = false;
     }
 
@@ -115,11 +109,7 @@
       name: form.elements.name.value,
       phone: form.elements.phone.value,
       email: form.elements.email.value,
-      password: form.elements.password.value,
-      address: form.elements.address.value,
-      city: form.elements.city.value,
-      state: form.elements.state.value,
-      zip: form.elements.zip.value
+      password: form.elements.password.value
     };
 
     setButtonLoading(submitBtn, true, 'Criando conta...');

@@ -19,6 +19,10 @@
   let cachedOrders = [];
   let orderFilters = {};
   let cachedCustomers = [];
+  const listFilters = { products: {}, customers: {}, reviews: {} };
+  const listRequests = { products: 0, customers: 0, reviews: 0 };
+  let cachedProducts = [];
+  let cachedReviews = [];
   let currentProductImage = null; // dataURL da foto enviada no formulário de produto
   let currentProductGallery = []; // dataURLs das fotos adicionais (galeria da página do produto)
   let editingCategoryId = null;
@@ -53,14 +57,14 @@
       return;
     }
 
-    container.innerHTML = orders
+    container.innerHTML = '<div class="recent-order-row recent-order-row--head"><span>Pedido</span><span>Cliente / produtos</span><span>Valor</span><span>Status</span></div>' + orders
       .map(
         (o) => `
         <div class="recent-order-row">
           <span class="recent-order-row__number">#${o.number}</span>
-          <span>${Utils.escapeHtml(o.customerName)}</span>
-          <span>${Utils.formatCurrency(o.total)}</span>
-          ${Utils.statusBadgeHtml(o.status)}
+          <span class="recent-order-row__info">${Utils.escapeHtml(o.customerName)}<small>${Utils.escapeHtml((o.items || []).map((item) => `${item.qty}x ${item.name}`).join(', '))}</small></span>
+          <span class="recent-order-row__value">${Utils.formatCurrency(o.total)}</span>
+          <span class="recent-order-row__status">${Utils.statusBadgeHtml(o.status)}</span>
         </div>`
       )
       .join('');
@@ -188,6 +192,8 @@
         <td>${Utils.escapeHtml(product.name)}</td>
         <td>${Utils.escapeHtml(product.category)}</td>
         <td>${Utils.formatCurrency(product.price)}</td>
+        <td>${product.costPrice == null ? 'Não informado' : Utils.formatCurrency(product.costPrice)}</td>
+        <td>${product.profitMargin == null ? '—' : Number(product.profitMargin).toFixed(2) + '%'}</td>
         <td>${product.stock ?? '-'}</td>
         <td>
           <span class="status-pill ${product.active === false ? 'status-pill--off' : 'status-pill--on'}">
@@ -210,7 +216,7 @@
     if (!tbody) return;
 
     if (!products.length) {
-      tbody.innerHTML = `<tr><td colspan="7" class="empty-cell">Nenhum produto cadastrado.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" class="empty-cell">Nenhum produto encontrado com esses filtros.</td></tr>`;
       return;
     }
     tbody.innerHTML = products.map(productRowHtml).join('');
@@ -227,8 +233,9 @@
     if (product) {
       form.elements.name.value = product.name;
       form.elements.description.value = product.description;
-      form.elements.price.value = product.price;
-      form.elements.compareAtPrice.value = product.compareAtPrice || '';
+      form.elements.salePrice.value = product.compareAtPrice || product.price;
+      form.elements.promotionalPrice.value = product.compareAtPrice ? product.price : '';
+      form.elements.costPrice.value = product.costPrice == null ? '' : product.costPrice;
       form.elements.category.value = product.category;
       form.elements.icon.value = product.icon || '';
       form.elements.color.value = product.color || '#D99163';
@@ -245,6 +252,7 @@
       editingProductUpdatedAt = null;
     }
     updateProductImagePreview();
+    updateProductMargin();
     renderProductGalleryRows();
 
     Utils.openModal('modal-product-form');
@@ -324,11 +332,18 @@
   function handleProductFormSubmit(e) {
     e.preventDefault();
     const form = e.target;
+    const original = Number(form.elements.salePrice.value);
+    const promotion = form.elements.promotionalPrice.value === '' ? null : Number(form.elements.promotionalPrice.value);
+    if (promotion != null && (!(promotion > 0) || promotion >= original)) {
+      Utils.showToast('O preço promocional deve ser maior que zero e menor que o valor original.', 'warning');
+      return;
+    }
     const payload = {
       name: form.elements.name.value.trim(),
       description: form.elements.description.value.trim(),
-      price: parseFloat(form.elements.price.value) || 0,
-      compareAtPrice: parseFloat(form.elements.compareAtPrice.value) || null,
+      price: promotion == null ? original : promotion,
+      compareAtPrice: promotion == null ? null : original,
+      costPrice: form.elements.costPrice.value === '' ? null : Number(form.elements.costPrice.value),
       category: form.elements.category.value.trim() || 'Geral',
       icon: form.elements.icon.value.trim() || '🛍️',
       color: form.elements.color.value || '#D99163',
@@ -373,8 +388,63 @@
     }).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
-  function loadProducts() {
-    return DataService.Products.getAllAdmin().then(renderProductsTable).catch((err) => Utils.showToast(err.message, 'error'));
+  function updateProductMargin() {
+    const form = document.getElementById('form-product');
+    const price = Number(form.elements.promotionalPrice.value || form.elements.salePrice.value);
+    const cost = form.elements.costPrice.value;
+    form.elements.profitMargin.value = cost !== '' && price > 0 ? `${((price - Number(cost)) / price * 100).toFixed(2)}%` : '';
+  }
+
+  function loadProducts(more = false) { return loadFilteredList('products', more === true); }
+  function loadCustomers(more = false) { return loadFilteredList('customers', more === true); }
+
+  function loadFilteredList(type, more = false) {
+    const repositories = { products: DataService.Products, customers: DataService.Customers, reviews: DataService.Reviews };
+    const cached = { products: cachedProducts, customers: cachedCustomers, reviews: cachedReviews }[type];
+    const repository = repositories[type];
+    const request = ++listRequests[type];
+    const button = document.getElementById(`admin-${type}-load-more`);
+    if (button) button.disabled = true;
+    const method = type === 'customers' ? 'getAll' : 'getAllAdmin';
+    return repository[method]({ ...listFilters[type], limit: PAGE_SIZE, offset: more ? cached.length : 0 }).then((rows) => {
+      if (request !== listRequests[type]) return;
+      const list = more ? [...cached, ...rows.filter((row) => !cached.some((old) => old.id === row.id))] : rows;
+      if (type === 'products') { cachedProducts = list; renderProductsTable(list); }
+      if (type === 'customers') { cachedCustomers = list; renderCustomersTable(list); }
+      if (type === 'reviews') { cachedReviews = list; renderReviewsTable(list); }
+      document.getElementById(`admin-${type}-filter-count`).textContent = `${list.length} registro(s) exibido(s).`;
+      if (button) button.classList.toggle('is-hidden', rows.length < PAGE_SIZE);
+    }).catch((err) => Utils.showToast(err.message, 'error')).finally(() => { if (button && request === listRequests[type]) button.disabled = false; });
+  }
+
+  function setupListFilters() {
+    const definitions = {
+      products: [ ['search','Nome ou descrição','search'], ['category','Categoria','text'], ['active','Status', [['','Todos'],['true','Ativos'],['false','Inativos']]], ['minValue','Preço mínimo','number'], ['maxValue','Preço máximo','number'], ['maxStock','Estoque até','number'] ],
+      customers: [ ['search','Nome, e-mail ou telefone','search'], ['city','Cidade','search'], ['state','UF','text'], ['minValue','Total gasto mínimo','number'], ['maxValue','Total gasto máximo','number'], ['from','Cadastrado desde','date'], ['to','Cadastrado até','date'] ],
+      reviews: [ ['search','Produto, nome ou comentário','search'], ['approved','Status', [['','Todos'],['false','Pendentes'],['true','Publicadas']]], ['rating','Nota', [['','Todas'],['1','1 estrela'],['2','2 estrelas'],['3','3 estrelas'],['4','4 estrelas'],['5','5 estrelas']]], ['from','Data inicial','date'], ['to','Data final','date'] ]
+    };
+    Object.entries(definitions).forEach(([type, fields]) => {
+      const table = document.getElementById(`admin-${type}-tbody`).closest('.table-scroll');
+      const form = document.createElement('form');
+      form.id = `admin-${type}-filters`;
+      form.className = 'admin-list-filters';
+      form.innerHTML = fields.map(([name,label,kind]) => `<div class="form-field"><label for="filter-${type}-${name}">${label}</label>${Array.isArray(kind) ? `<select id="filter-${type}-${name}" name="${name}">${kind.map(([value,text])=>`<option value="${value}">${text}</option>`).join('')}</select>` : `<input id="filter-${type}-${name}" name="${name}" type="${kind}" ${kind === 'number' ? 'min="0" step="0.01"' : ''}>`}</div>`).join('') + '<div class="order-filters__actions"><button class="btn btn--primary btn--sm" type="submit">Filtrar</button><button class="btn btn--outline btn--sm" type="reset">Limpar</button></div>';
+      table.before(form);
+      const count = document.createElement('p');
+      count.id = `admin-${type}-filter-count`; count.className = 'theme-hint'; count.setAttribute('aria-live','polite');
+      table.before(count);
+      let button = document.getElementById(`admin-${type}-load-more`);
+      if (!button) {
+        button = document.createElement('button'); button.type = 'button'; button.id = `admin-${type}-load-more`; button.className = 'btn btn--outline btn--sm table-pagination'; button.textContent = 'Carregar mais'; table.after(button);
+        button.addEventListener('click', () => loadFilteredList(type,true));
+      }
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        listFilters[type] = Object.fromEntries([...new FormData(form)].map(([key,value]) => [key, key === 'state' ? value.trim().toUpperCase() : value.trim()]));
+        loadFilteredList(type);
+      });
+      form.addEventListener('reset', () => { listFilters[type] = {}; loadFilteredList(type); });
+    });
   }
 
   // ==========================================================================
@@ -466,7 +536,7 @@
   }
 
   function loadReviews() {
-    return DataService.Reviews.getAllAdmin().then(renderReviewsTable).catch((err) => Utils.showToast(err.message, 'error'));
+    return loadFilteredList('reviews');
   }
 
   function renderAuditTable(entries) {
@@ -793,13 +863,14 @@
     });
     const titles = {
       dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', categorias: 'Categorias',
-      relatorios: 'Relatórios', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
+      relatorios: 'Relatórios', custos: 'Custos e lucratividade', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
     };
     const title = document.getElementById('admin-topbar-title');
     if (title) title.textContent = titles[tabName] || 'Painel Administrativo';
     if (tabName === 'avaliacoes') loadReviews();
     if (tabName === 'auditoria') loadAudit();
     if (tabName === 'relatorios' && global.AdminReportsModule) global.AdminReportsModule.onAdminTabActivated();
+    if (tabName === 'custos' && global.AdminCostsModule) global.AdminCostsModule.load();
   }
 
   // ==========================================================================
@@ -846,18 +917,16 @@
   function loadAll() {
     return Promise.all([
       DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }),
-      DataService.Customers.getAll({ limit: PAGE_SIZE, offset: 0 }),
+      loadCustomers(),
       DataService.Orders.getAdminSummary()
     ]).then(
       ([orders, customers, summary]) => {
         cachedOrders = orders;
-        cachedCustomers = customers;
         if (!Object.values(orderFilters).some((value) => value !== '' && value != null)) checkForNewOrders(orders);
         renderDashboard(summary);
         renderCustomersTable(cachedCustomers);
         renderOrdersTable(cachedOrders);
         document.getElementById('admin-orders-load-more')?.classList.toggle('is-hidden', orders.length < PAGE_SIZE);
-        document.getElementById('admin-customers-load-more')?.classList.toggle('is-hidden', customers.length < PAGE_SIZE);
       }
     ).catch((err) => Utils.showToast(err.message, 'error'));
   }
@@ -884,14 +953,7 @@
   }
 
   function loadMoreCustomers() {
-    const button = document.getElementById('admin-customers-load-more');
-    if (button) button.disabled = true;
-    return DataService.Customers.getAll({ limit: PAGE_SIZE, offset: cachedCustomers.length }).then((customers) => {
-      const known = new Set(cachedCustomers.map((customer) => customer.id));
-      cachedCustomers.push(...customers.filter((customer) => !known.has(customer.id)));
-      renderCustomersTable(cachedCustomers);
-      if (button) button.classList.toggle('is-hidden', customers.length < PAGE_SIZE);
-    }).catch((err) => Utils.showToast(err.message, 'error')).finally(() => { if (button) button.disabled = false; });
+    return loadCustomers(true);
   }
 
   function enter() {
@@ -1011,6 +1073,7 @@
 
     const productForm = document.getElementById('form-product');
     if (productForm) productForm.addEventListener('submit', handleProductFormSubmit);
+    productForm?.addEventListener('input', updateProductMargin);
 
     const prodImageInput = document.getElementById('prod-image-input');
     if (prodImageInput) prodImageInput.addEventListener('change', handleProductImageInput);
@@ -1046,6 +1109,8 @@
 
   function init() {
     if (global.AdminReportsModule) global.AdminReportsModule.init();
+    if (global.AdminCostsModule) global.AdminCostsModule.init();
+    setupListFilters();
     wireEvents();
     wireSiteContentForm();
     switchTab('dashboard');

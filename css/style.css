@@ -1328,7 +1328,7 @@ input, textarea, select { font-family: inherit; font-size: 0.95rem; }
   border: 3px solid color-mix(in srgb, var(--category-color) 72%, var(--color-accent));
   box-shadow: var(--shadow-md); font-size: 3.1rem; transition: transform .18s ease, box-shadow .18s ease;
 }
-.category-card__visual img { width: 100%; height: 100%; object-fit: cover; }
+.category-card__visual img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
 .category-card:hover .category-card__visual { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
 .category-card.is-active .category-card__visual { box-shadow: 0 0 0 5px var(--color-accent-bg), var(--shadow-lg); }
 .admin-categories-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 22px; }

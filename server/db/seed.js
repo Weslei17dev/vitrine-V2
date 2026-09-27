@@ -11,7 +11,7 @@
    ============================================================================ */
 
 require('dotenv').config();
-const bcrypt = require('bcryptjs');
+const { hashPassword } = require('../src/utils/passwords');
 const { Pool } = require('pg');
 const { SITE_CONTENT_DEFAULTS, deepMerge } = require('../src/site-defaults');
 
@@ -40,10 +40,6 @@ async function main() {
     console.error('\n❌ Configure ADMIN_EMAIL e ADMIN_PASSWORD antes de executar o seed.\n');
     process.exit(1);
   }
-  if (ADMIN_PASSWORD.length < 10 || !/[A-Za-zÀ-ÿ]/.test(ADMIN_PASSWORD) || !/\d/.test(ADMIN_PASSWORD)) {
-    console.error('\n❌ ADMIN_PASSWORD deve ter pelo menos 10 caracteres, contendo letras e números.\n');
-    process.exit(1);
-  }
 
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -60,7 +56,7 @@ async function main() {
     // ------------------------------------------------------------------
     const existingAdmin = await client.query('SELECT id, role FROM users WHERE lower(email) = $1', [ADMIN_EMAIL]);
     if (existingAdmin.rows.length === 0) {
-      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+      const passwordHash = await hashPassword(ADMIN_PASSWORD);
       await client.query(
         `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, 'admin')`,
         [ADMIN_NAME, ADMIN_EMAIL, passwordHash]
@@ -70,7 +66,7 @@ async function main() {
       if (existingAdmin.rows[0].role !== 'admin') {
         throw new Error('ADMIN_EMAIL pertence a uma conta de cliente. Escolha outro e-mail para não promover uma conta por engano.');
       }
-      const passwordHash = await bcrypt.hash(ADMIN_PASSWORD, 12);
+      const passwordHash = await hashPassword(ADMIN_PASSWORD);
       await client.query(
         `UPDATE users SET name=$1, password_hash=$2, role='admin', token_version=token_version+1, updated_at=now()
          WHERE lower(email)=$3`,

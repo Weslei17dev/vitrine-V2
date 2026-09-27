@@ -7,6 +7,7 @@ const { expirePendingOrders } = require('../utils/orderLifecycle');
 const { parseReportFilters, percentChange } = require('../utils/reporting');
 
 const router = express.Router();
+router.use('/costs', require('./costs'));
 
 const RECOGNIZED_STATUSES = "'Pago','Em Produção','Enviado','Finalizado'";
 const PENDING_STATUSES = "'Aguardando Pagamento','Aguardando Confirmação'";

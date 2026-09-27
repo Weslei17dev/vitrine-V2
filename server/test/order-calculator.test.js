@@ -10,8 +10,14 @@ test('calcula preços somente com os valores do banco', () => {
   const result = calculateOrder(requested, products);
   assert.equal(result.totalCents, 5980);
   assert.deepEqual(result.items[0], {
-    productId: 'produto-1', name: 'Produto real', price: 29.9, qty: 2, subtotal: 59.8
+    productId: 'produto-1', name: 'Produto real', price: 29.9, qty: 2, subtotal: 59.8, unitCost: null
   });
+});
+
+test('registra o custo do banco no momento da venda sem aceitar custo do cliente', () => {
+  const result = calculateOrder([{productId:'p1', qty:2, unitCost:0}], [{id:'p1', name:'Produto', price:80, cost_price:50, stock:3, active:true}]);
+  assert.equal(result.items[0].unitCost, 50);
+  assert.equal(result.totalCents, 16000);
 });
 
 test('recusa produto inativo e estoque insuficiente', () => {

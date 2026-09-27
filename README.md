@@ -31,7 +31,7 @@ O faturamento considera apenas pedidos nos status `Pago`, `Em Produção`, `Envi
 - transições de status controladas;
 - JWT de curta duração, usuário revalidado no PostgreSQL e revogação por `token_version`;
 - sessão do navegador em `sessionStorage`, sem credenciais de teste na página;
-- senha mínima de 10 caracteres, bcrypt com custo 12 e limite de tentativas;
+- senha sem regras de tamanho no cadastro, scrypt para novas senhas, compatibilidade com bcrypt existente e limite de tentativas;
 - CORS fechado em produção, limites de requisição e cabeçalhos de segurança;
 - validação e limite de tamanho em textos, imagens e requisições;
 - conteúdo público não expõe a chave PIX;

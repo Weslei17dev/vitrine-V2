@@ -2,7 +2,7 @@
 'use strict';
 
 const express = require('express');
-const bcrypt = require('bcryptjs');
+const { hashPassword, verifyPassword } = require('../utils/passwords');
 const jwt = require('jsonwebtoken');
 const pool = require('../db');
 const config = require('../config');
@@ -11,7 +11,7 @@ const { authLimiter } = require('../security');
 const V = require('../validation');
 
 const router = express.Router();
-const dummyPasswordHash = bcrypt.hash('comparacao-de-tempo-sem-usuario-2026', 12);
+const dummyPasswordHash = hashPassword('comparacao-de-tempo-sem-usuario-2026');
 
 router.use((req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -49,23 +49,24 @@ function signToken(user) {
 }
 
 function validateProfile(body) {
+  const hasAddress = ['address', 'city', 'state', 'zip'].some((key) => String(body[key] || '').trim());
   return {
     name: V.text(body.name, 'Nome', { min: 3, max: 120 }),
     phone: V.phone(body.phone),
-    address: V.text(body.address, 'Endereço', { min: 5, max: 250 }),
-    city: V.text(body.city, 'Cidade', { min: 2, max: 100 }),
-    state: V.state(body.state),
-    zip: V.zip(body.zip),
+    address: hasAddress ? V.text(body.address, 'Endereço', { min: 5, max: 250 }) : null,
+    city: hasAddress ? V.text(body.city, 'Cidade', { min: 2, max: 100 }) : null,
+    state: hasAddress ? V.state(body.state) : null,
+    zip: hasAddress ? V.zip(body.zip) : null,
     avatar: V.imageSource(body.avatar || '', 'Foto do perfil')
   };
 }
 
 router.post('/register', authLimiter, async (req, res, next) => {
   try {
-    const profile = validateProfile(req.body || {});
+    const profile = validateProfile({ name: req.body?.name, phone: req.body?.phone });
     const email = V.normalizeEmail(req.body && req.body.email);
     const userPassword = V.password(req.body && req.body.password);
-    const passwordHash = await bcrypt.hash(userPassword, 12);
+    const passwordHash = await hashPassword(userPassword);
 
     const result = await pool.query(
       `INSERT INTO users (name, email, password_hash, role, phone, address, city, state, zip)
@@ -86,13 +87,13 @@ router.post('/login', authLimiter, async (req, res, next) => {
   try {
     const email = V.normalizeEmail(req.body && req.body.email);
     const suppliedPassword = String((req.body && req.body.password) || '');
-    if (!suppliedPassword || suppliedPassword.length > 128) {
+    if (!suppliedPassword) {
       return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
     }
 
     const result = await pool.query('SELECT * FROM users WHERE lower(email) = $1', [email]);
     const row = result.rows[0];
-    const matches = await bcrypt.compare(suppliedPassword, row ? row.password_hash : await dummyPasswordHash);
+    const matches = await verifyPassword(suppliedPassword, row ? row.password_hash : await dummyPasswordHash);
     if (!row || !matches) return res.status(401).json({ message: 'E-mail ou senha inválidos.' });
 
     res.json({ token: signToken(row), user: toPublicUser(row) });
@@ -130,10 +131,10 @@ router.post('/change-password', requireAuth, authLimiter, async (req, res, next)
     const currentPassword = String((req.body && req.body.currentPassword) || '');
     const newPassword = V.password(req.body && req.body.newPassword, 'Nova senha');
     const found = await pool.query('SELECT password_hash FROM users WHERE id=$1', [req.user.id]);
-    const matches = found.rows[0] && await bcrypt.compare(currentPassword, found.rows[0].password_hash);
+    const matches = found.rows[0] && await verifyPassword(currentPassword, found.rows[0].password_hash);
     if (!matches) return res.status(400).json({ message: 'Senha atual incorreta.' });
 
-    const passwordHash = await bcrypt.hash(newPassword, 12);
+    const passwordHash = await hashPassword(newPassword);
     const updated = await pool.query(
       `UPDATE users SET password_hash=$1, token_version=token_version+1, updated_at=now()
        WHERE id=$2 RETURNING *`,

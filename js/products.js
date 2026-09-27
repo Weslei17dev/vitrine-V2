@@ -53,6 +53,11 @@
 
     renderCategoryNavigation(categories.slice(1));
     renderCatalogPageFilters(categories);
+    const select = document.getElementById('nav-category-select');
+    if (select) {
+      select.innerHTML = categories.map((category) => `<option value="${Utils.escapeHtml(category)}">${category === 'Todos' ? 'Todas as categorias' : Utils.escapeHtml(category)}</option>`).join('');
+      select.value = state.category;
+    }
   }
 
   const CATEGORY_ICONS = [
@@ -71,7 +76,7 @@
   function renderCategoryNavigation(categories) {
     const root = document.getElementById('category-navigation');
     if (!root) return;
-    const list = categories.slice(0, 8);
+    const list = categories;
     if (!list.length) {
       root.innerHTML = '<p class="text-muted">As categorias aparecerão aqui quando houver produtos cadastrados.</p>';
       return;
@@ -91,6 +96,9 @@
     root.querySelectorAll('[data-category-index]').forEach((button) => {
       button.addEventListener('click', () => {
         state.category = list[parseInt(button.dataset.categoryIndex, 10)];
+        state.catalogSearch = '';
+        const search = document.getElementById('catalog-page-search');
+        if (search) search.value = '';
         renderCategoryFilters();
         renderGrid();
         renderCatalogPage();
@@ -133,7 +141,7 @@
     return `
       <article class="product-card" data-id="${product.id}">
         <div class="product-card__image" style="background:${Utils.safeColor(product.color)}22;">
-          ${imageHtml}
+          ${global.ProductMedia.render(product)}
           <span class="product-card__category">${Utils.escapeHtml(product.category)}</span>
           ${discountBadgeHtml(product)}
         </div>
@@ -163,7 +171,7 @@
       <article class="featured-card" data-id="${product.id}">
         <span class="featured-card__badge"><i class="fa-solid fa-star"></i> Destaque</span>
         <div class="featured-card__image" style="background:${Utils.safeColor(product.color)}22;">
-          ${imageHtml}
+          ${global.ProductMedia.render(product)}
           ${discountBadgeHtml(product)}
         </div>
         <div class="featured-card__body">
@@ -310,6 +318,7 @@
   }
 
   function loadAndRender(force) {
+    if (force && global.ProductMedia) global.ProductMedia.clear();
     if (loadPromise && !force) return loadPromise;
     loadPromise = Promise.all([
       DataService.Products.getAll(Boolean(force)),
@@ -332,6 +341,12 @@
   }
 
   function init() {
+    document.getElementById('nav-category-select')?.addEventListener('change', (event) => {
+      state.category = event.target.value;
+      state.catalogSearch = '';
+      document.getElementById('catalog-page-search').value = '';
+      renderCategoryFilters(); renderGrid(); renderCatalogPage(); global.App.navigate('catalog');
+    });
     wireSearch();
     wireGridClicks();
     wireFeaturedClicks();

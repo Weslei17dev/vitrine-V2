@@ -184,8 +184,8 @@
     getById(id) {
       return apiFetch(`/api/products/${id}`);
     },
-    getAllAdmin() {
-      return apiFetch('/api/products/admin/all');
+    getAllAdmin(options = {}) {
+      return apiFetch(`/api/products/admin/all?${new URLSearchParams(options)}`);
     },
     getByIdAdmin(id) {
       return apiFetch(`/api/products/admin/${id}`);
@@ -279,7 +279,7 @@
     getAll(options = {}) {
       const limit = Number(options.limit) || 100;
       const offset = Number(options.offset) || 0;
-      return apiFetch(`/api/customers?limit=${encodeURIComponent(limit)}&offset=${encodeURIComponent(offset)}`);
+      return apiFetch(`/api/customers?${new URLSearchParams({...options, limit, offset})}`);
     }
   };
 
@@ -368,14 +368,14 @@
   // REPOSITÓRIO: Avaliações de produtos
   // ============================================================================
   const ReviewRepository = {
-    getByProduct(productId) {
-      return apiFetch(`/api/reviews/product/${productId}`);
+    getByProduct(productId, options = {}) {
+      return apiFetch(`/api/reviews/product/${productId}?${new URLSearchParams(options)}`);
     },
     create({ productId, rating, comment }) {
       return apiFetch('/api/reviews', { method: 'POST', body: JSON.stringify({ productId, rating, comment }) });
     },
-    getAllAdmin() {
-      return apiFetch('/api/reviews/admin/all');
+    getAllAdmin(options = {}) {
+      return apiFetch(`/api/reviews/admin/all?${new URLSearchParams(options)}`);
     },
     approve(reviewId) {
       return apiFetch(`/api/reviews/${reviewId}/approve`, { method: 'PATCH' });
@@ -413,6 +413,9 @@
   // REPOSITÓRIO: Relatórios gerenciais (somente administrador)
   // ============================================================================
   const ReportsRepository = {
+    getCosts(filters = {}) {
+      return apiFetch(`/api/reports/costs?${new URLSearchParams(filters)}`);
+    },
     getFilters() {
       return apiFetch('/api/reports/filters');
     },

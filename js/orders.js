@@ -34,12 +34,18 @@
 
     container.innerHTML = `
       <h3><i class="fa-solid fa-user"></i> Dados para entrega</h3>
-      <div class="checkout-summary-box">
+      <form id="checkout-address-form" class="checkout-summary-box">
         <p><strong>${Utils.escapeHtml(user.name)}</strong></p>
-        <p>${Utils.escapeHtml(user.address)} — ${Utils.escapeHtml(user.city)}/${Utils.escapeHtml(user.state)}</p>
-        <p>CEP: ${Utils.escapeHtml(user.zip)} · Tel: ${Utils.escapeHtml(user.phone)}</p>
         <p>${Utils.escapeHtml(user.email)}</p>
-      </div>
+        <p class="theme-hint">Informe ou atualize o endereço. Ele será salvo no seu perfil ao confirmar o pedido.</p>
+        <div class="form-grid">
+          <div class="form-field form-field--span2"><label for="checkout-address">Endereço completo</label><input id="checkout-address" name="address" autocomplete="street-address" required minlength="5" value="${Utils.escapeHtml(user.address || '')}" placeholder="Rua, número, complemento e bairro"></div>
+          <div class="form-field"><label for="checkout-city">Cidade</label><input id="checkout-city" name="city" autocomplete="address-level2" required minlength="2" value="${Utils.escapeHtml(user.city || '')}"></div>
+          <div class="form-field"><label for="checkout-state">UF</label><input id="checkout-state" name="state" autocomplete="address-level1" required maxlength="2" minlength="2" value="${Utils.escapeHtml(user.state || '')}"></div>
+          <div class="form-field"><label for="checkout-zip">CEP</label><input id="checkout-zip" name="zip" autocomplete="postal-code" required inputmode="numeric" value="${Utils.escapeHtml(user.zip || '')}"></div>
+          <div class="form-field"><label for="checkout-phone">Telefone</label><input id="checkout-phone" name="phone" autocomplete="tel" required value="${Utils.escapeHtml(user.phone || '')}"></div>
+        </div>
+      </form>
 
       <h3><i class="fa-solid fa-bag-shopping"></i> Itens do pedido</h3>
       <table class="simple-table">
@@ -57,6 +63,7 @@
         <i class="fa-solid fa-circle-info"></i>
         Confira seus dados de entrega antes de confirmar. Ao confirmar, um código PIX será gerado para pagamento.
       </p>`;
+    document.getElementById('checkout-address-form').addEventListener('submit', (event) => { event.preventDefault(); confirmCheckout(); });
   }
 
   function openCheckout(items) {
@@ -109,8 +116,21 @@
     }
   }
 
-  function confirmCheckout() {
+  async function confirmCheckout() {
     const confirmBtn = document.getElementById('confirm-order-btn');
+    if (confirmBtn?.disabled) return;
+    const addressForm = document.getElementById('checkout-address-form');
+    if (!addressForm || !addressForm.reportValidity()) return;
+    if (confirmBtn) confirmBtn.disabled = true;
+    try {
+      const current = global.App.state.currentUser;
+      const profile = await DataService.Auth.updateProfile({ ...current, ...Object.fromEntries(new FormData(addressForm)) });
+      global.App.setCurrentUser(profile);
+    } catch (err) {
+      if (confirmBtn) confirmBtn.disabled = false;
+      Utils.showToast(err.message, 'error');
+      return;
+    }
 
     const orderItems = pendingCheckout.items.map((i) => ({
       productId: i.productId,

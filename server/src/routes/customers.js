@@ -9,23 +9,23 @@ const pool = require('../db');
 const { requireAdmin } = require('../auth-middleware');
 
 const router = express.Router();
+const { adminFilters } = require('../utils/adminFilters');
 
 router.get('/', requireAdmin, async (req, res, next) => {
   try {
-    const requestedLimit = Number.parseInt(req.query.limit, 10);
-    const limit = Number.isInteger(requestedLimit) && requestedLimit > 0 ? Math.min(requestedLimit, 500) : 200;
-    const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0);
+    const f = adminFilters(req.query, { search: ["name || ' ' || email || ' ' || COALESCE(phone,'')", 'search'], city: ["COALESCE(city,'')", 'search'], state: ['state'], minValue: ['total_spent','min'], maxValue: ['total_spent','max'], from:['created_at','from'], to:['created_at','to'] });
     const result = await pool.query(`
+      WITH clients AS (
       SELECT
-        u.id, u.name, u.phone, u.email, u.city, u.state,
+        u.id, u.name, u.phone, u.email, u.city, u.state, u.created_at,
         COALESCE(SUM(o.total) FILTER (WHERE o.status NOT IN ('Cancelado', 'Aguardando Pagamento', 'Aguardando Confirmação')), 0) AS total_spent
       FROM users u
       LEFT JOIN orders o ON o.user_id = u.id
       WHERE u.role = 'client'
       GROUP BY u.id
-      ORDER BY u.created_at DESC
-      LIMIT $1 OFFSET $2
-    `, [limit, offset]);
+      ) SELECT * FROM clients ${f.where}
+      ORDER BY created_at DESC, id ${f.pagination}
+    `, f.params);
 
     res.json(
       result.rows.map((row) => ({

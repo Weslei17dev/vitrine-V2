@@ -104,8 +104,8 @@
         )
         .join('') +
       (list.length > 1
-        ? `<button type="button" class="promo-carousel__arrow promo-carousel__arrow--prev" data-carousel-direction="prev" aria-label="Banner anterior"><i class="fa-solid fa-chevron-left"></i></button>
-           <button type="button" class="promo-carousel__arrow promo-carousel__arrow--next" data-carousel-direction="next" aria-label="Próximo banner"><i class="fa-solid fa-chevron-right"></i></button>
+        ? `<button type="button" class="promo-carousel__arrow promo-carousel__arrow--prev" data-carousel-direction="prev" aria-label="Banner anterior">&#10094;</button>
+           <button type="button" class="promo-carousel__arrow promo-carousel__arrow--next" data-carousel-direction="next" aria-label="Próximo banner">&#10095;</button>
            <div class="promo-carousel__dots">
             ${list.map((_, i) => `<button type="button" class="${i === 0 ? 'is-active' : ''}" data-slide="${i}" aria-label="Mostrar banner ${i + 1}" aria-current="${i === 0 ? 'true' : 'false'}"></button>`).join('')}
            </div>
@@ -150,7 +150,7 @@
     function updateAutoplayControl() {
       if (!autoplayToggle) return;
       autoplayToggle.setAttribute('aria-label', autoplayPaused ? 'Retomar rotação dos banners' : 'Pausar rotação dos banners');
-      autoplayToggle.innerHTML = `<i class="fa-solid fa-${autoplayPaused ? 'play' : 'pause'}"></i>`;
+      autoplayToggle.innerHTML = autoplayPaused ? '&#9654;' : '&#10074;&#10074;';
     }
 
     dotEls.forEach((dot) => {
@@ -174,10 +174,23 @@
       else startAutoplay();
       updateAutoplayControl();
     });
-    root.addEventListener('mouseenter', stopAutoplay);
-    root.addEventListener('mouseleave', startAutoplay);
-    root.addEventListener('focusin', stopAutoplay);
-    root.addEventListener('focusout', startAutoplay);
+    root.onmouseenter = stopAutoplay;
+    root.onmouseleave = startAutoplay;
+    root.onfocusin = stopAutoplay;
+    root.onfocusout = startAutoplay;
+    root.onkeydown = (event) => {
+      if (!['ArrowLeft','ArrowRight'].includes(event.key)) return;
+      event.preventDefault(); show(index + (event.key === 'ArrowRight' ? 1 : -1)); stopAutoplay();
+    };
+    let touchStart = null;
+    root.ontouchstart = (event) => { touchStart = { x:event.changedTouches[0].clientX, y:event.changedTouches[0].clientY }; stopAutoplay(); };
+    root.ontouchend = (event) => {
+      if (!touchStart) return;
+      const dx = event.changedTouches[0].clientX-touchStart.x;
+      const dy = event.changedTouches[0].clientY-touchStart.y;
+      if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy)) show(index + (dx < 0 ? 1 : -1));
+      touchStart = null; startAutoplay();
+    };
 
     updateAutoplayControl();
     startAutoplay();

@@ -8,6 +8,7 @@ const V = require('../validation');
 const { recordAudit } = require('../utils/audit');
 
 const router = express.Router();
+const { adminFilters } = require('../utils/adminFilters');
 
 function toPublicReview(row) {
   return {
@@ -32,11 +33,11 @@ function toAdminReview(row) {
 
 router.get('/admin/all', requireAdmin, async (req, res, next) => {
   try {
+    const f = adminFilters(req.query, { search: ["p.name || ' ' || r.author_name || ' ' || r.comment", 'search'], approved:['r.approved','boolean'], rating:['r.rating'], from:['r.created_at','from'], to:['r.created_at','to'] });
     const result = await pool.query(
       `SELECT r.*, p.name AS product_name
        FROM reviews r JOIN products p ON p.id=r.product_id
-       ORDER BY r.approved ASC, r.created_at DESC
-       LIMIT 500`
+       ${f.where} ORDER BY r.approved ASC, r.created_at DESC, r.id ${f.pagination}`, f.params
     );
     res.json(result.rows.map(toAdminReview));
   } catch (err) {
@@ -47,12 +48,14 @@ router.get('/admin/all', requireAdmin, async (req, res, next) => {
 router.get('/product/:productId', async (req, res, next) => {
   try {
     const productId = V.uuid(req.params.productId, 'Produto');
-    const result = await pool.query(
-      'SELECT * FROM reviews WHERE product_id=$1 AND approved=true ORDER BY created_at DESC LIMIT 200',
-      [productId]
-    );
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 3));
+    const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+    const [result, summary] = await Promise.all([
+      pool.query('SELECT * FROM reviews WHERE product_id=$1 AND approved=true ORDER BY created_at DESC, id LIMIT $2 OFFSET $3', [productId, limit, offset]),
+      pool.query('SELECT COUNT(*)::integer AS total, COALESCE(AVG(rating),0) AS average FROM reviews WHERE product_id=$1 AND approved=true', [productId])
+    ]);
     res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
-    res.json(result.rows.map(toPublicReview));
+    res.json({ reviews: result.rows.map(toPublicReview), total: summary.rows[0].total, ratingAverage: Number(summary.rows[0].average) });
   } catch (err) {
     next(err);
   }

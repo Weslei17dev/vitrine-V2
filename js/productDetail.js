@@ -13,6 +13,9 @@
 
   let currentProduct = null;
   let selectedRating = 5;
+  let loadedReviews = [];
+  let totalReviews = 0;
+  let productRequest = 0;
 
   // --------------------------------------------------------------------------
   // Galeria de fotos
@@ -21,7 +24,7 @@
     const images = [];
     if (Utils.safeImageSrc(product.image)) images.push(Utils.safeImageSrc(product.image));
     if (Array.isArray(product.gallery)) images.push(...product.gallery.map(Utils.safeImageSrc).filter(Boolean));
-    return images;
+    return [...new Set(images)];
   }
 
   function renderGallery(product) {
@@ -31,8 +34,13 @@
 
     const images = galleryImages(product);
 
-    function setMain(src) {
-      mainEl.innerHTML = `<img src="${Utils.escapeHtml(Utils.safeImageSrc(src))}" alt="${Utils.escapeHtml(product.name)}">`;
+    let selected = 0;
+    function setMain(index) {
+      selected = (index + images.length) % images.length;
+      mainEl.innerHTML = `<img src="${Utils.escapeHtml(images[selected])}" alt="${Utils.escapeHtml(product.name)} — foto ${selected + 1}">${images.length > 1 ? '<button type="button" class="product-media__arrow product-media__arrow--prev" data-detail-prev aria-label="Foto anterior">&#10094;</button><button type="button" class="product-media__arrow product-media__arrow--next" data-detail-next aria-label="Próxima foto">&#10095;</button>' + `<span class="product-media__count" aria-live="polite">${selected + 1} / ${images.length}</span>` : ''}`;
+      mainEl.querySelector('[data-detail-prev]')?.addEventListener('click', () => { setMain(selected - 1); mainEl.querySelector('[data-detail-prev]').focus(); });
+      mainEl.querySelector('[data-detail-next]')?.addEventListener('click', () => { setMain(selected + 1); mainEl.querySelector('[data-detail-next]').focus(); });
+      thumbsEl.querySelectorAll('.pd-thumb').forEach((button, n) => { button.classList.toggle('is-active', n === selected); button.setAttribute('aria-pressed', String(n === selected)); });
     }
 
     if (!images.length) {
@@ -41,7 +49,7 @@
       return;
     }
 
-    setMain(images[0]);
+    setMain(0);
 
     if (images.length === 1) {
       thumbsEl.innerHTML = '';
@@ -49,14 +57,12 @@
     }
 
     thumbsEl.innerHTML = images
-      .map((src, i) => `<button class="pd-thumb ${i === 0 ? 'is-active' : ''}" data-src="${Utils.escapeHtml(src)}"><img src="${Utils.escapeHtml(src)}" alt=""></button>`)
+      .map((src, i) => `<button type="button" class="pd-thumb ${i === 0 ? 'is-active' : ''}" data-photo="${i}" aria-label="Mostrar foto ${i+1}" aria-pressed="${i === 0}"><img src="${Utils.escapeHtml(src)}" alt=""></button>`)
       .join('');
 
     thumbsEl.querySelectorAll('.pd-thumb').forEach((btn) => {
       btn.addEventListener('click', () => {
-        setMain(btn.dataset.src);
-        thumbsEl.querySelectorAll('.pd-thumb').forEach((b) => b.classList.remove('is-active'));
-        btn.classList.add('is-active');
+        setMain(Number(btn.dataset.photo));
       });
     });
   }
@@ -102,11 +108,11 @@
     return html;
   }
 
-  function renderReviewsSummary(reviews) {
-    const avg = reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0;
+  function renderReviewsSummary(summary) {
+    const avg = summary.ratingAverage;
     document.getElementById('pd-rating-stars').innerHTML = starsHtml(avg, false);
-    document.getElementById('pd-rating-summary').textContent = reviews.length
-      ? `${avg.toFixed(1)} de 5 · ${reviews.length} ${reviews.length === 1 ? 'avaliação' : 'avaliações'}`
+    document.getElementById('pd-rating-summary').textContent = summary.total
+      ? `${avg.toFixed(1)} de 5 · ${summary.total} ${summary.total === 1 ? 'avaliação' : 'avaliações'}`
       : 'Ainda sem avaliações';
   }
 
@@ -130,13 +136,23 @@
       </div>`
       )
       .join('');
+    if (loadedReviews.length < totalReviews) {
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'btn btn--outline btn--sm'; button.id = 'pd-reviews-more';
+      button.textContent = `Ver mais avaliações (${loadedReviews.length} de ${totalReviews})`;
+      button.addEventListener('click', () => { button.disabled = true; loadReviews(currentProduct.id, true).finally(() => { button.disabled = false; }); });
+      list.appendChild(button);
+    }
   }
 
-  function loadReviews(productId) {
-    return DataService.Reviews.getByProduct(productId).then((reviews) => {
-      renderReviewsSummary(reviews);
-      renderReviewsList(reviews);
-    });
+  function loadReviews(productId, more = false) {
+    if (!more) loadedReviews = [];
+    return DataService.Reviews.getByProduct(productId, {limit:3, offset:loadedReviews.length}).then((data) => {
+      if (currentProduct?.id !== productId) return;
+      totalReviews = data.total;
+      loadedReviews = more ? loadedReviews.concat(data.reviews) : data.reviews;
+      renderReviewsSummary(data);
+      renderReviewsList(loadedReviews);
+    }).catch((err) => Utils.showToast('Não foi possível carregar as avaliações.', 'error'));
   }
 
   function setSelectedRating(value) {
@@ -214,7 +230,7 @@
     return `
       <article class="product-card" data-id="${product.id}">
         <div class="product-card__image" style="background:${Utils.safeColor(product.color)}22;">
-          ${imageHtml}
+          ${global.ProductMedia.render(product)}
           <span class="product-card__category">${Utils.escapeHtml(product.category)}</span>
         </div>
         <div class="product-card__body">
@@ -283,8 +299,10 @@
   // Exibição
   // --------------------------------------------------------------------------
   function render(productId) {
+    const sequence = ++productRequest;
     DataService.Products.getById(productId)
       .then((product) => {
+        if (sequence !== productRequest) return;
         currentProduct = product;
         document.title = `${product.name} — Brincar de Desejo`;
         setSelectedRating(5);

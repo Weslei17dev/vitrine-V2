@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS products (
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price numeric(10, 2);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price numeric(10, 2) CHECK (cost_price >= 0);
 DO $$
 BEGIN
   ALTER TABLE products ADD CONSTRAINT products_price_positive CHECK (price > 0) NOT VALID;

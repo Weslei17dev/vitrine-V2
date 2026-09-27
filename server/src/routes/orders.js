@@ -40,7 +40,7 @@ function toPublicOrder(row) {
       state: row.shipping_state,
       zip: row.shipping_zip
     },
-    items: Array.isArray(row.items) ? row.items : [],
+    items: Array.isArray(row.items) ? row.items.map(({ unitCost, ...item }) => item) : [],
     subtotal: Number(row.subtotal) > 0 ? Number(row.subtotal) : Number(row.total),
     shippingTotal: Number(row.shipping_total || 0),
     total: Number(row.total),
@@ -112,7 +112,7 @@ router.post('/quote', requireAuth, orderLimiter, async (req, res, next) => {
     const content = await readStoreContent();
     const calculated = calculateOrder(requestedItems, productsResult.rows, shippingForSubtotal(content, initial.subtotalCents));
     res.json({
-      items: calculated.items,
+      items: calculated.items.map(({ unitCost, ...item }) => item),
       subtotal: calculated.subtotalCents / 100,
       shippingTotal: calculated.shippingCents / 100,
       total: calculated.totalCents / 100,
@@ -170,7 +170,7 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
 
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await client.query(
-      'SELECT id, name, price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+      'SELECT id, name, price, cost_price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
       [productIds]
     );
     if (productsResult.rows.length !== productIds.length) throw new V.ValidationError('Um dos produtos não está mais disponível.');

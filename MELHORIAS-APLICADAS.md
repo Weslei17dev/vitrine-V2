@@ -35,8 +35,8 @@
 - JWT com algoritmo, emissor, público e expiração de duas horas.
 - Usuário e versão da sessão são conferidos no banco em toda rota protegida.
 - Alterar a senha revoga tokens anteriores.
-- Senhas exigem 10 a 128 caracteres, letras e números.
-- bcrypt atualizado e configurado com custo 12.
+- Cadastro sem regras de tamanho da senha; senha vazia não é aceita.
+- Novas senhas usam scrypt, considerando todos os caracteres. Hashes bcrypt existentes continuam aceitos.
 - Limites separados para API, login, pedidos e avaliações.
 - CORS obrigatório em produção e mensagens internas ocultadas.
 - Cabeçalhos HSTS, CSP da API, proteção de iframe, MIME e permissões.

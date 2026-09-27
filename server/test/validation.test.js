@@ -11,9 +11,10 @@ test('normaliza e valida dados de cadastro', () => {
   assert.equal(V.state('pr'), 'PR');
 });
 
-test('exige senha com tamanho, letras e números', () => {
-  assert.throws(() => V.password('123'), /10 e 128/);
-  assert.throws(() => V.password('senhasemnumero'), /letras e números/);
+test('aceita senha sem limite de caracteres, mas rejeita vazio', () => {
+  assert.throws(() => V.password(''), /obrigatória/);
+  assert.equal(V.password('123'), '123');
+  assert.equal(V.password('x'.repeat(500)), 'x'.repeat(500));
   assert.equal(V.password('SenhaSegura123'), 'SenhaSegura123');
 });
 

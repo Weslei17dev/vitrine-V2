@@ -5,6 +5,7 @@ const pool = require('../db');
 const { requireAdmin } = require('../auth-middleware');
 const V = require('../validation');
 const { recordAudit } = require('../utils/audit');
+const { adminFilters } = require('../utils/adminFilters');
 
 const router = express.Router();
 
@@ -22,6 +23,7 @@ function toPublicProduct(row) {
     active: row.active,
     image: row.image,
     gallery: row.gallery || [],
+    imageCount: new Set([row.image, ...(row.gallery || [])].filter(Boolean)).size,
     details: row.details,
     ratingAverage: Number(row.rating_average || 0),
     ratingCount: Number(row.rating_count || 0),
@@ -29,8 +31,15 @@ function toPublicProduct(row) {
   };
 }
 
+function toAdminProduct(row) {
+  const cost = row.cost_price == null ? null : Number(row.cost_price);
+  return { ...toPublicProduct(row), costPrice: cost,
+    profitMargin: cost == null ? null : ((Number(row.price) - cost) / Number(row.price)) * 100 };
+}
+
 function toProductSummary(row) {
   const product = toPublicProduct(row);
+  product.image = product.image || product.gallery[0] || null;
   delete product.gallery;
   delete product.details;
   return product;
@@ -42,13 +51,14 @@ function validateProduct(body) {
   const price = V.positiveMoney(body.price);
   const compareAtPrice = V.optionalMoney(body.compareAtPrice, 'Valor anterior');
   if (compareAtPrice != null && compareAtPrice <= price) {
-    throw new V.ValidationError('O valor anterior deve ser maior que o valor atual.');
+    throw new V.ValidationError('O valor original deve ser maior que o preço promocional.');
   }
   return {
     name: V.text(body.name, 'Nome', { min: 2, max: 160 }),
     description: V.text(body.description, 'Descrição', { min: 3, max: 1200 }),
     price,
     compareAtPrice,
+    costPrice: body.costPrice == null || body.costPrice === '' ? null : V.nonNegativeMoney(body.costPrice, 'Custo'),
     category: V.text(body.category || 'Geral', 'Categoria', { max: 80 }),
     icon: V.text(body.icon || '🛍️', 'Ícone', { max: 8 }),
     color: V.color(body.color || '#D99163'),
@@ -79,8 +89,9 @@ async function findProduct(id, includeInactive) {
 
 router.get('/admin/all', requireAdmin, async (req, res, next) => {
   try {
-    const result = await pool.query('SELECT * FROM products ORDER BY created_at DESC');
-    res.json(result.rows.map(toPublicProduct));
+    const f = adminFilters(req.query, { search: ["name || ' ' || description", 'search'], category: ['category'], active: ['active', 'boolean'], minValue: ['price','min'], maxValue: ['price','max'], maxStock: ['stock','max'] });
+    const result = await pool.query(`SELECT * FROM products ${f.where} ORDER BY created_at DESC, id ${f.pagination}`, f.params);
+    res.json(result.rows.map(toAdminProduct));
   } catch (err) {
     next(err);
   }
@@ -90,7 +101,7 @@ router.get('/admin/:id', requireAdmin, async (req, res, next) => {
   try {
     const row = await findProduct(req.params.id, true);
     if (!row) return res.status(404).json({ message: 'Produto não encontrado.' });
-    res.json(toPublicProduct(row));
+    res.json(toAdminProduct(row));
   } catch (err) {
     next(err);
   }
@@ -134,15 +145,15 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const p = validateProduct(req.body || {});
     await pool.query('INSERT INTO categories (name,color) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [p.category, p.color]);
     const result = await pool.query(
-      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, p.gallery, p.details]
+      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details, cost_price)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13) RETURNING *`,
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, p.costPrice]
     );
     await recordAudit(pool, {
       adminId: req.user.id, action: 'product.create', entityType: 'product', entityId: result.rows[0].id,
       details: { name: p.name, price: p.price, stock: p.stock }
     });
-    res.status(201).json(toPublicProduct(result.rows[0]));
+    res.status(201).json(toAdminProduct(result.rows[0]));
   } catch (err) {
     next(err);
   }
@@ -156,9 +167,9 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     const expectedUpdatedAt = V.timestamp(req.body && req.body.updatedAt);
     const result = await pool.query(
       `UPDATE products SET name=$1, description=$2, price=$3, compare_at_price=$4, category=$5, icon=$6, color=$7,
-         stock=$8, active=$9, image=$10, gallery=$11, details=$12, updated_at=now()
+         stock=$8, active=$9, image=$10, gallery=$11::jsonb, details=$12, cost_price=$15, updated_at=now()
        WHERE id=$13 AND date_trunc('milliseconds', updated_at)=date_trunc('milliseconds', $14::timestamptz) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, p.gallery, p.details, id, expectedUpdatedAt]
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, id, expectedUpdatedAt, p.costPrice]
     );
     if (!result.rows[0]) {
       const exists = await pool.query('SELECT 1 FROM products WHERE id=$1', [id]);
@@ -169,7 +180,7 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
       adminId: req.user.id, action: 'product.update', entityType: 'product', entityId: id,
       details: { name: p.name, price: p.price, stock: p.stock, active: p.active }
     });
-    res.json(toPublicProduct(result.rows[0]));
+    res.json(toAdminProduct(result.rows[0]));
   } catch (err) {
     next(err);
   }

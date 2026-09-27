@@ -27,12 +27,7 @@ function normalizeEmail(value) {
 
 function password(value, label = 'Senha') {
   const normalized = String(value || '');
-  if (normalized.length < 10 || normalized.length > 128) {
-    throw new ValidationError(`${label} deve ter entre 10 e 128 caracteres.`);
-  }
-  if (!/[A-Za-zÀ-ÿ]/.test(normalized) || !/\d/.test(normalized)) {
-    throw new ValidationError(`${label} deve conter letras e números.`);
-  }
+  if (!normalized) throw new ValidationError(`${label} é obrigatória.`);
   return normalized;
 }
 

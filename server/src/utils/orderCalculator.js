@@ -24,7 +24,8 @@ function calculateOrder(requestedItems, productRows, shippingCents = 0) {
       name: product.name,
       price: unitCents / 100,
       qty: requested.qty,
-      subtotal: lineCents / 100
+      subtotal: lineCents / 100,
+      unitCost: product.cost_price == null ? null : toCents(product.cost_price) / 100
     };
   });
   if (!Number.isSafeInteger(shippingCents) || shippingCents < 0) throw new ValidationError('Frete inválido.');
