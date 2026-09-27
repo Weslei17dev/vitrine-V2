@@ -392,6 +392,14 @@
   function overviewInsights(data) {
     const s = data.summary;
     const items = [];
+    if (s.totalOrders > 0 && s.paidOrders === 0) {
+      items.push({
+        tone: 'warning',
+        icon: 'fa-circle-info',
+        title: 'Pedidos sem receita reconhecida',
+        text: `Há ${formatInteger(s.totalOrders)} pedido(s) no período, mas nenhum está Pago, Em Produção, Enviado ou Finalizado. Pedidos pendentes e cancelados não entram no faturamento.`
+      });
+    }
     const change = s.changes.revenue;
     if (change === null && s.revenue > 0) items.push({ tone: 'success', icon: 'fa-sparkles', title: 'Nova receita no comparativo', text: `O período faturou ${formatCurrency(s.revenue)} e o período anterior não teve receita reconhecida.` });
     else if (change > 0) items.push({ tone: 'success', icon: 'fa-arrow-trend-up', title: 'Faturamento em alta', text: `A receita cresceu ${formatDecimal(change)}% sobre o período anterior de mesma duração.` });
@@ -664,8 +672,8 @@
       const form = element('reports-filter-form');
       if (form) form.reset();
       const preset = element('report-period-preset');
-      if (preset) preset.value = '30d';
-      applyPreset('30d');
+      if (preset) preset.value = 'all';
+      applyPreset('all');
       loadReport();
     });
     element('reports-refresh-btn')?.addEventListener('click', loadReport);
@@ -692,14 +700,21 @@
     if (initialized) return;
     initialized = true;
     wireEvents();
-    applyPreset('30d');
+    applyPreset('all');
     switchReportView('overview');
   }
 
   function onAdminTabActivated() {
     init();
     return loadFilterOptions().then(() => {
-      if (!hasLoadedReport) return loadReport();
+      if (!hasLoadedReport) {
+        const preset = element('report-period-preset');
+        if (preset) preset.value = 'all';
+        // Agora que a API informou a data do primeiro pedido, recalcula o
+        // período para que a primeira abertura realmente cubra o histórico.
+        applyPreset('all');
+        return loadReport();
+      }
       return reportData;
     }).catch((err) => showError(err.message || 'Não foi possível carregar os filtros dos relatórios.'));
   }

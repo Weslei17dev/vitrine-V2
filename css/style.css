@@ -209,7 +209,7 @@ input, textarea, select { font-family: inherit; font-size: 0.95rem; }
 .header-nav a.is-active { background: var(--color-primary-bg); color: var(--color-primary); }
 
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.header-guest-actions, .header-client-actions { display: flex; align-items: center; gap: 10px; }
+.header-guest-actions, .header-client-actions, .header-admin-actions { display: flex; align-items: center; gap: 10px; }
 .user-chip {
   display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px;
   background: var(--color-bg); color: var(--color-text); border: 1px solid transparent;
@@ -782,6 +782,9 @@ input, textarea, select { font-family: inherit; font-size: 0.95rem; }
 .admin-nav__item.is-active { background: rgba(255,255,255,0.14); color: #fff; }
 .admin-sidebar__logout { background: rgba(255,255,255,0.06); color: #fff; border-color: rgba(255,255,255,0.2); }
 .admin-sidebar__logout:hover { border-color: #fff; }
+.admin-sidebar__actions { display: grid; gap: 8px; }
+.admin-sidebar__store { background: rgba(255,255,255,0.12); color: #fff; border-color: rgba(255,255,255,0.28); }
+.admin-sidebar__store:hover { background: rgba(255,255,255,0.18); border-color: #fff; }
 
 .admin-main { flex: 1; padding: 28px 32px 60px; min-width: 0; }
 .admin-topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }

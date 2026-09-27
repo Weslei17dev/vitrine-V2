@@ -48,6 +48,7 @@
     const header = document.getElementById('site-header');
     const guestActions = document.getElementById('header-guest-actions');
     const clientActions = document.getElementById('header-client-actions');
+    const adminActions = document.getElementById('header-admin-actions');
     const navLinks = document.getElementById('header-nav-links');
     const myOrdersLink = document.getElementById('nav-my-orders');
     const userNameEl = document.getElementById('header-user-name');
@@ -60,12 +61,14 @@
       header.classList.remove('is-hidden');
       guestActions.classList.remove('is-hidden');
       clientActions.classList.add('is-hidden');
+      adminActions?.classList.add('is-hidden');
       navLinks.classList.remove('is-hidden');
       if (myOrdersLink) myOrdersLink.classList.add('is-hidden');
     } else if (state.currentUser.role === 'client') {
       header.classList.remove('is-hidden');
       guestActions.classList.add('is-hidden');
       clientActions.classList.remove('is-hidden');
+      adminActions?.classList.add('is-hidden');
       navLinks.classList.remove('is-hidden');
       if (myOrdersLink) myOrdersLink.classList.remove('is-hidden');
       if (userNameEl) userNameEl.textContent = state.currentUser.name.split(' ')[0];
@@ -75,10 +78,21 @@
           ? `<img src="${Utils.escapeHtml(avatar)}" alt="Foto de ${Utils.escapeHtml(state.currentUser.name)}">`
           : '<i class="fa-solid fa-user"></i>';
       }
-    } else {
-      // O administrador usa um layout próprio (sidebar), então escondemos
-      // o cabeçalho da loja por completo.
+    } else if (currentView === 'admin') {
+      // Dentro do painel, a sidebar já oferece toda a navegação necessária.
       header.classList.add('is-hidden');
+      guestActions.classList.add('is-hidden');
+      clientActions.classList.add('is-hidden');
+      adminActions?.classList.add('is-hidden');
+    } else {
+      // O administrador também pode navegar pela loja e voltar ao painel
+      // usando um acesso próprio no cabeçalho.
+      header.classList.remove('is-hidden');
+      guestActions.classList.add('is-hidden');
+      clientActions.classList.add('is-hidden');
+      adminActions?.classList.remove('is-hidden');
+      navLinks.classList.remove('is-hidden');
+      if (myOrdersLink) myOrdersLink.classList.add('is-hidden');
     }
   }
 
@@ -95,15 +109,9 @@
     let view = requestedView;
 
     // Guardas de acesso:
-    // - a loja (catálogo) é pública: visitante navega livremente, sem login;
-    //   apenas o administrador é redirecionado para o próprio painel.
+    // - a loja e as páginas públicas podem ser acessadas também pelo admin;
+    // - a área do cliente continua exclusiva para clientes.
     // - a área do cliente (pedidos) e o checkout continuam exigindo login.
-    if (view === 'store') {
-      if (state.currentUser && state.currentUser.role === 'admin') view = 'admin';
-    }
-    if (['catalog', 'product-detail', 'blog', 'blog-article', 'legal'].includes(view)) {
-      if (state.currentUser && state.currentUser.role === 'admin') view = 'admin';
-    }
     if (view === 'customer-orders') {
       if (!state.currentUser) view = 'login';
       else if (state.currentUser.role === 'admin') view = 'admin';
@@ -257,10 +265,9 @@
       navigate('login');
     });
 
-    // 'store' é o destino padrão para todos: visitante e cliente ficam na
-    // loja; o administrador é automaticamente redirecionado pela guarda de
-    // acesso em navigate() para o painel administrativo.
-    navigate('store');
+    // Clientes e visitantes abrem a loja. O administrador continua entrando
+    // direto no painel, mas agora pode alternar entre painel e vitrine.
+    navigate(state.currentUser?.role === 'admin' ? 'admin' : 'store');
   }
 
   global.App = { state, navigate, setCurrentUser, getCurrentView: () => currentView };

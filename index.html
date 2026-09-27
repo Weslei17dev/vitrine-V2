@@ -63,6 +63,15 @@
           <i class="fa-solid fa-right-from-bracket"></i> Sair
         </button>
       </div>
+
+      <div id="header-admin-actions" class="header-admin-actions is-hidden">
+        <button class="btn btn--outline btn--sm" data-nav="admin">
+          <i class="fa-solid fa-user-shield"></i> Administrador
+        </button>
+        <button class="btn btn--outline btn--sm" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sair
+        </button>
+      </div>
     </div>
   </div>
 </header>
@@ -216,10 +225,9 @@
       <div id="featured-products-grid" class="featured-grid"></div>
     </section>
 
-    <section id="category-navigation-section" class="home-section category-section" aria-labelledby="category-navigation-title">
+    <section id="category-navigation-section" class="home-section category-section" aria-label="Categorias de produtos">
       <div class="section-heading section-heading--center">
         <span class="section-eyebrow">Encontre do seu jeito</span>
-        <h2 id="category-navigation-title">Navegue por categorias</h2>
         <p>Escolha um caminho e vá direto ao que combina com você.</p>
       </div>
       <div id="category-navigation" class="category-navigation"></div>
@@ -592,9 +600,14 @@
         </button>
       </nav>
 
-      <button class="btn btn--outline btn--sm admin-sidebar__logout" data-action="logout">
-        <i class="fa-solid fa-right-from-bracket"></i> Sair
-      </button>
+      <div class="admin-sidebar__actions">
+        <button class="btn btn--outline btn--sm admin-sidebar__store" data-nav="store">
+          <i class="fa-solid fa-store"></i> Ver loja
+        </button>
+        <button class="btn btn--outline btn--sm admin-sidebar__logout" data-action="logout">
+          <i class="fa-solid fa-right-from-bracket"></i> Sair
+        </button>
+      </div>
     </aside>
 
     <main class="admin-main">
@@ -683,6 +696,7 @@
               <label class="reports-filter-field">
                 <span>Período rápido</span>
                 <select id="report-period-preset" name="preset">
+                  <option value="all" selected>Todo o histórico</option>
                   <option value="30d">Últimos 30 dias</option>
                   <option value="today">Hoje</option>
                   <option value="7d">Últimos 7 dias</option>
@@ -690,7 +704,6 @@
                   <option value="lastMonth">Mês anterior</option>
                   <option value="90d">Últimos 90 dias</option>
                   <option value="thisYear">Este ano</option>
-                  <option value="all">Todo o histórico</option>
                   <option value="custom">Personalizado</option>
                 </select>
               </label>
