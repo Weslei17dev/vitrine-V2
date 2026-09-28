@@ -63,7 +63,7 @@
         (o) => `
         <div class="recent-order-row">
           <span class="recent-order-row__number">#${o.number}</span>
-          <span class="recent-order-row__info">${Utils.escapeHtml(o.customerName)}<small>${Utils.escapeHtml((o.items || []).map((item) => `${item.qty}x ${item.name}`).join(', '))}</small></span>
+          <span class="recent-order-row__info">${Utils.escapeHtml(o.customerName)}<small>${Utils.escapeHtml((o.items || []).map((item) => `${item.qty}x ${item.name}${item.selectedColor ? ` (${item.selectedColor})` : ''}`).join(', '))}</small></span>
           <span class="recent-order-row__value">${Utils.formatCurrency(o.total)}</span>
           <span class="recent-order-row__status">${Utils.statusBadgeHtml(o.status)}</span>
         </div>`
@@ -123,7 +123,7 @@
   }
 
   function orderRowHtml(order) {
-    const itemsPreview = order.items.map((i) => `${i.qty}x ${i.name}`).join(', ');
+    const itemsPreview = order.items.map((i) => `${i.qty}x ${i.name}${i.selectedColor ? ` (${i.selectedColor})` : ''}`).join(', ');
     const isNew = recentlyNewIds.has(order.id);
     return `
       <tr data-id="${order.id}" class="${isNew ? 'row-highlight' : ''}">
@@ -241,6 +241,7 @@
       form.elements.category.value = product.category;
       form.elements.icon.value = product.icon || '';
       form.elements.color.value = product.color || '#D99163';
+      form.elements.colors.value = (product.colors || []).map((entry) => `${entry.name} | ${entry.hex}`).join('\n');
       form.elements.stock.value = product.stock ?? 0;
       form.elements.active.checked = product.active !== false;
       form.elements.details.value = product.details || '';
@@ -336,6 +337,11 @@
     const form = e.target;
     const original = Number(form.elements.salePrice.value);
     const promotion = form.elements.promotionalPrice.value === '' ? null : Number(form.elements.promotionalPrice.value);
+    const colorLines = form.elements.colors.value.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (colorLines.some((line) => !/^.{2,40}\s*\|\s*#[0-9a-fA-F]{6}$/.test(line))) {
+      Utils.showToast('Informe uma cor por linha: Nome | #RRGGBB.', 'warning');
+      return;
+    }
     if (promotion != null && (!(promotion > 0) || promotion >= original)) {
       Utils.showToast('O preço promocional deve ser maior que zero e menor que o valor original.', 'warning');
       return;
@@ -349,6 +355,7 @@
       category: form.elements.category.value.trim() || 'Geral',
       icon: form.elements.icon.value.trim() || '🛍️',
       color: form.elements.color.value || '#D99163',
+      colors: colorLines.map((line) => { const [name, hex] = line.split('|'); return {name:name.trim(),hex:hex.trim()}; }),
       stock: parseInt(form.elements.stock.value, 10) || 0,
       active: form.elements.active.checked,
       image: currentProductImage || null,

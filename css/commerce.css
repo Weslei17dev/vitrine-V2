@@ -99,6 +99,20 @@
 .checkout-coupon-form label { font-weight:700; font-size:.9rem; }
 .checkout-coupon-form > div { display:flex; gap:8px; flex-wrap:wrap; }
 .checkout-coupon-form input { flex:1; min-width:150px; padding:10px; color:var(--color-text); border:1px solid var(--color-border); border-radius:7px; background:var(--color-bg); text-transform:uppercase; }
+.cart-footer .checkout-coupon-form { margin:0 0 12px; padding:12px; width:100%; }
+.cart-footer .checkout-costs { width:100%; margin-bottom:12px; }
+.cart-footer { align-items:stretch; }
+.cart-footer .cart-total-row { width:100%; gap:16px; }
+.cart-footer .checkout-costs > div { align-items:flex-start; }
+.cart-footer .checkout-costs > div strong { white-space:nowrap; }
+.cart-footer .checkout-costs small { display:block; margin-top:7px; line-height:1.4; }
+.checkout-item-color { display:block; color:var(--color-muted,#736a70); margin-top:3px; }
+.pd-colors { margin:8px 0 18px; }
+.pd-colors strong { display:block; margin-bottom:10px; font-size:.9rem; }
+.pd-color-options { display:flex; flex-wrap:wrap; gap:8px; }
+.pd-color-options button { display:inline-flex; align-items:center; gap:7px; border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); border-radius:8px; padding:8px 10px; cursor:pointer; }
+.pd-color-options button[aria-pressed="true"] { border-color:var(--color-primary); box-shadow:0 0 0 2px var(--color-primary) inset; }
+.pd-color-dot { width:19px; height:19px; border:1px solid #999; border-radius:50%; flex:none; }
 .checkout-discount strong { color:var(--color-success); }
 .promotion-form { border:1px solid var(--color-border); border-radius:12px; padding:20px; margin:20px 0; }
 .promotion-active { display:inline-flex; align-items:center; gap:8px; margin:8px 0 16px; }

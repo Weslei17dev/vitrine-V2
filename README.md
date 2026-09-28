@@ -137,9 +137,11 @@ O QR Code é um PIX estático válido, mas a confirmação do recebimento é man
 
 O estoque é reservado quando o pedido é criado. Ao cancelar ou expirar um pedido aguardando pagamento, a API devolve as quantidades ao estoque uma única vez. O frete atual é uma tarifa fixa configurável no painel, com limite opcional para gratuidade e prazo estimado.
 
+O cliente pode aplicar cupons no carrinho e no checkout. O administrador cadastra descontos em produtos/categorias e cupons de frete grátis. As opções de cor são cadastradas por produto e registradas no pedido, usando o estoque total do produto. Em uma loja existente, execute `MIGRACAO-FRETE-CORES.sql` após a migração de descontos. A tarifa padrão de R$ 14,90 e o limite de R$ 199,00 servem apenas como exemplo; configure valores reais em **Personalizar → Frete**.
+
 ## Limites conhecidos
 
-- não existe pagamento por cartão, integração com transportadora/Correios ou cupom;
+- não existe pagamento por cartão nem integração com transportadora/Correios; o frete usa a tarifa fixa configurada no painel, sem consulta por CEP;
 - não existe webhook bancário para confirmação automática;
 - recuperação de senha, confirmação de e-mail e MFA dependem de um provedor de e-mail/autenticação e não estão ativados nesta versão;
 - o limitador de requisições usa memória do processo, adequado para uma instância do Render; múltiplas instâncias devem usar um armazenamento compartilhado, como Redis;

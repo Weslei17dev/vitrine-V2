@@ -53,12 +53,14 @@ CREATE TABLE IF NOT EXISTS products (
   active      boolean NOT NULL DEFAULT true,
   image       text,
   gallery     jsonb NOT NULL DEFAULT '[]'::jsonb,
+  colors      jsonb NOT NULL DEFAULT '[]'::jsonb,
   details     text,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 
 ALTER TABLE products ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE products ADD COLUMN IF NOT EXISTS colors jsonb NOT NULL DEFAULT '[]'::jsonb;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS compare_at_price numeric(10, 2);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS cost_price numeric(10, 2) CHECK (cost_price >= 0);
 DO $$
@@ -179,8 +181,8 @@ CREATE TABLE IF NOT EXISTS promotions (
   scope text NOT NULL CHECK (scope IN ('all','category','product')),
   category text,
   product_id uuid REFERENCES products(id) ON DELETE SET NULL,
-  discount_type text NOT NULL CHECK (discount_type IN ('percent','fixed')),
-  value numeric(10,2) NOT NULL CHECK (value > 0),
+  discount_type text NOT NULL CHECK (discount_type IN ('percent','fixed','free_shipping')),
+  value numeric(10,2) NOT NULL CHECK ((discount_type='free_shipping' AND value=0) OR (discount_type<>'free_shipping' AND value>0)),
   active boolean NOT NULL DEFAULT true,
   starts_at timestamptz,
   ends_at timestamptz,
@@ -195,10 +197,19 @@ CREATE TABLE IF NOT EXISTS promotions (
   CONSTRAINT promotions_dates CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at > starts_at)
 );
 CREATE INDEX IF NOT EXISTS idx_promotions_active ON promotions(kind,active,starts_at,ends_at);
+ALTER TABLE promotions DROP CONSTRAINT IF EXISTS promotions_discount_type_check;
+ALTER TABLE promotions DROP CONSTRAINT IF EXISTS promotions_value_check;
+ALTER TABLE promotions DROP CONSTRAINT IF EXISTS promotions_shipping_type;
+ALTER TABLE promotions ADD CONSTRAINT promotions_shipping_type CHECK (
+  discount_type IN ('percent','fixed','free_shipping') AND
+  ((discount_type='free_shipping' AND value=0 AND kind='coupon') OR
+   (discount_type<>'free_shipping' AND value>0))
+);
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount_total numeric(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS automatic_discount numeric(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_discount numeric(10,2) NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS coupon_code text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_discount numeric(10,2) NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS coupon_redemptions (
   order_id uuid PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
   promotion_id uuid NOT NULL REFERENCES promotions(id) ON DELETE RESTRICT,

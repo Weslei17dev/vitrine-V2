@@ -18,6 +18,7 @@
   let productRequest = 0;
   let gallerySelection = 0;
   let selectPhoto = null;
+  let selectedColor = null;
 
   // --------------------------------------------------------------------------
   // Galeria de fotos
@@ -122,6 +123,17 @@
     document.getElementById('pd-description').textContent = product.description.length > 230 ? product.description.slice(0, 227) + '…' : product.description;
     document.getElementById('pd-full-description').textContent = product.description;
     document.getElementById('pd-stock').textContent = Number(product.stock) > 0 ? `Estoque disponível · ${product.stock} unidade${Number(product.stock) === 1 ? '' : 's'}` : 'Produto indisponível no momento';
+    selectedColor = null;
+    const colorBox = document.getElementById('pd-colors');
+    const colors = Array.isArray(product.colors) ? product.colors : [];
+    colorBox.hidden = colors.length === 0;
+    colorBox.innerHTML = colors.length ? `<strong>Escolha a cor: <span id="pd-color-selected">selecione uma opção</span></strong><div class="pd-color-options">${colors.map((entry) => `<button type="button" data-color="${Utils.escapeHtml(entry.name)}" aria-label="Cor ${Utils.escapeHtml(entry.name)}" aria-pressed="false"><span class="pd-color-dot" style="background:${Utils.safeColor(entry.hex)}"></span>${Utils.escapeHtml(entry.name)}</button>`).join('')}</div>` : '';
+    colorBox.querySelectorAll('[data-color]').forEach((button) => button.addEventListener('click', () => {
+      selectedColor = button.dataset.color;
+      colorBox.querySelectorAll('[data-color]').forEach((choice) => choice.setAttribute('aria-pressed', String(choice === button)));
+      document.getElementById('pd-color-selected').textContent = selectedColor;
+      document.getElementById('pd-cart-feedback').textContent = '';
+    }));
     document.getElementById('pd-quantity').value = 1;
     document.getElementById('pd-cart-feedback').textContent = '';
     document.getElementById('pd-buy-btn').disabled = Number(product.stock) <= 0;
@@ -342,14 +354,14 @@
     const addBtn = document.getElementById('pd-add-btn');
     if (!addBtn) return;
     addBtn.addEventListener('click', () => {
-      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct)) {
+      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct, selectedColor)) {
         const feedback = document.getElementById('pd-cart-feedback');
         feedback.innerHTML = 'Adicionado. <button type="button">Ver carrinho</button>';
         feedback.querySelector('button').addEventListener('click', () => Utils.openModal('modal-cart'));
       }
     });
     document.getElementById('pd-buy-btn').addEventListener('click', () => {
-      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct)) global.CartModule.checkout();
+      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct, selectedColor)) global.CartModule.checkout();
     });
     document.getElementById('pd-quantity').addEventListener('change', updateQuantity);
     [-1, 1].forEach((delta) => document.getElementById(delta < 0 ? 'pd-quantity-less' : 'pd-quantity-more').addEventListener('click', () => {

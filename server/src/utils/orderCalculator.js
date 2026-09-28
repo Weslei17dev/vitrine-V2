@@ -9,12 +9,18 @@ function toCents(value) {
 function calculateOrder(requestedItems, productRows, shippingCents = 0) {
   const productsById = new Map(productRows.map((product) => [product.id, product]));
   let subtotalCents = 0;
+  const totalByProduct = new Map();
+  requestedItems.forEach((item) => totalByProduct.set(item.productId, (totalByProduct.get(item.productId) || 0) + item.qty));
   const items = requestedItems.map((requested) => {
     const product = productsById.get(requested.productId);
     if (!product || !product.active) throw new ValidationError('Um dos produtos não está mais disponível.');
-    if (Number(product.stock) < requested.qty) {
+    if (Number(product.stock) < totalByProduct.get(requested.productId)) {
       throw new ValidationError(`Estoque insuficiente para ${product.name}. Disponível: ${product.stock}.`);
     }
+    const options = Array.isArray(product.colors) ? product.colors : [];
+    const option = options.find((color) => color.name === requested.selectedColor);
+    if (options.length && !option) throw new ValidationError(`Selecione uma cor disponível para ${product.name}.`);
+    if (!options.length && requested.selectedColor) throw new ValidationError(`A cor escolhida para ${product.name} não está mais disponível.`);
     const unitCents = toCents(product.price);
     if (!Number.isSafeInteger(unitCents) || unitCents <= 0) throw new ValidationError(`Preço inválido para ${product.name}.`);
     const lineCents = unitCents * requested.qty;
@@ -22,6 +28,7 @@ function calculateOrder(requestedItems, productRows, shippingCents = 0) {
     return {
       productId: product.id,
       name: product.name,
+      selectedColor: option?.name || null,
       price: unitCents / 100,
       qty: requested.qty,
       subtotal: lineCents / 100,

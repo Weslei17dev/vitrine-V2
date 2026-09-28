@@ -21,10 +21,10 @@
 <!-- Gerador de QR Code para o payload PIX calculado pela API -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=20260928-3">
-  <link rel="stylesheet" href="css/improvements.css?v=20260928-3">
-  <link rel="stylesheet" href="css/commerce.css?v=20260928-3">
-<script src="js/frameGuard.js?v=20260928-3"></script>
+  <link rel="stylesheet" href="css/style.css?v=20260928-4">
+  <link rel="stylesheet" href="css/improvements.css?v=20260928-4">
+  <link rel="stylesheet" href="css/commerce.css?v=20260928-4">
+<script src="js/frameGuard.js?v=20260928-4"></script>
 </head>
 <body>
 
@@ -469,6 +469,7 @@
 
         <div class="pd-buy-box">
           <p id="pd-stock" class="pd-stock"></p>
+          <div id="pd-colors" class="pd-colors" hidden></div>
           <label for="pd-quantity">Quantidade</label>
           <div class="pd-quantity-control"><button id="pd-quantity-less" type="button" aria-label="Diminuir quantidade">−</button><input id="pd-quantity" type="number" inputmode="numeric" min="1" max="99" value="1" aria-label="Quantidade de unidades"><button id="pd-quantity-more" type="button" aria-label="Aumentar quantidade">+</button><span id="pd-quantity-total" aria-live="polite"></span></div>
           <button id="pd-buy-btn" class="btn btn--primary btn--lg" type="button">Comprar agora</button>
@@ -950,8 +951,8 @@
               <div class="form-field"><label for="promotion-scope">Aplicar em</label><select id="promotion-scope" name="scope"><option value="all">Todos os produtos</option><option value="category">Uma categoria</option><option value="product">Um produto</option></select></div>
               <div class="form-field promotion-category-field" hidden><label for="promotion-category">Categoria</label><select id="promotion-category" name="category"></select></div>
               <div class="form-field promotion-product-field" hidden><label for="promotion-product">Produto</label><select id="promotion-product" name="productId"></select></div>
-              <div class="form-field"><label for="promotion-discount-type">Valor do desconto</label><select id="promotion-discount-type" name="discountType"><option value="percent">Porcentagem (%)</option><option value="fixed">Valor fixo (R$)</option></select></div>
-              <div class="form-field"><label for="promotion-value">Quantidade do desconto</label><input id="promotion-value" name="value" type="number" min="0.01" max="100" step="0.01" required placeholder="Ex.: 10"></div>
+              <div class="form-field"><label for="promotion-discount-type">Tipo de desconto</label><select id="promotion-discount-type" name="discountType"><option value="percent">Porcentagem (%)</option><option value="fixed">Valor fixo (R$)</option><option value="free_shipping">Frete grátis (cupom)</option></select></div>
+              <div class="form-field promotion-value-field"><label for="promotion-value">Quantidade do desconto</label><input id="promotion-value" name="value" type="number" min="0.01" max="100" step="0.01" required placeholder="Ex.: 10"></div>
               <div class="form-field promotion-limit-field" hidden><label for="promotion-max-uses">Limite total de usos (opcional)</label><input id="promotion-max-uses" name="maxUses" type="number" min="1" max="1000000" placeholder="Sem limite"></div>
               <div class="form-field"><label for="promotion-start">Início (opcional)</label><input id="promotion-start" name="startsAt" type="datetime-local"></div>
               <div class="form-field"><label for="promotion-end">Término (opcional)</label><input id="promotion-end" name="endsAt" type="datetime-local"></div>
@@ -1251,8 +1252,14 @@
     </div>
 
     <div id="cart-footer" class="modal__footer cart-footer is-hidden">
+      <form id="cart-coupon-form" class="checkout-coupon-form">
+        <label for="cart-coupon-code">Tem um cupom? Aplique aqui</label>
+        <div><input id="cart-coupon-code" type="text" maxlength="32" autocomplete="off" placeholder="Código do cupom"><button class="btn btn--outline btn--sm" type="submit">Aplicar</button><button id="cart-coupon-remove" class="btn btn--ghost btn--sm is-hidden" type="button">Remover</button></div>
+        <p id="cart-coupon-message" class="theme-hint" role="status"></p>
+      </form>
+      <div id="cart-costs" class="checkout-costs" aria-live="polite"></div>
       <div class="cart-total-row">
-        <span>Total</span>
+        <span>Total estimado</span>
         <strong id="cart-total">R$ 0,00</strong>
       </div>
       <div class="cart-footer__actions">
@@ -1427,6 +1434,12 @@
           </div>
 
           <div class="form-field form-field--span2">
+            <label for="prod-colors">Cores disponíveis (uma por linha)</label>
+            <textarea id="prod-colors" name="colors" rows="3" placeholder="Preto | #222222&#10;Bege | #D9B99B"></textarea>
+            <small class="theme-hint">Use Nome | #RRGGBB. O estoque é compartilhado entre todas as cores. Deixe vazio se o produto não tiver escolha de cor.</small>
+          </div>
+
+          <div class="form-field form-field--span2">
             <label for="prod-details">Informações adicionais (opcional — modo de uso, composição etc.)</label>
             <textarea id="prod-details" name="details" rows="3"></textarea>
           </div>
@@ -1463,24 +1476,24 @@
 <!-- ============================================================
      SCRIPTS (ordem importa: dataService/utils primeiro, app.js por último)
 ============================================================= -->
-<script src="js/apiConfig.js?v=20260928-3"></script>
-<script src="js/dataService.js?v=20260928-3"></script>
-<script src="js/utils.js?v=20260928-3"></script>
-<script src="js/auth.js?v=20260928-3"></script>
-<script src="js/siteContent.js?v=20260928-3"></script>
-<script src="js/blog.js?v=20260928-3"></script>
-<script src="js/legal.js?v=20260928-3"></script>
-<script src="js/products.js?v=20260928-3"></script>
-<script src="js/productMedia.js?v=20260928-3"></script>
-<script src="js/productDetail.js?v=20260928-3"></script>
-<script src="js/cart.js?v=20260928-3"></script>
-<script src="js/orders.js?v=20260928-3"></script>
-<script src="js/customerArea.js?v=20260928-3"></script>
-<script src="js/adminReports.js?v=20260928-3"></script>
-<script src="js/adminCosts.js?v=20260928-3"></script>
-<script src="js/adminPromotions.js?v=20260928-3"></script>
-<script src="js/adminPanel.js?v=20260928-3"></script>
-<script src="js/app.js?v=20260928-3"></script>
+<script src="js/apiConfig.js?v=20260928-4"></script>
+<script src="js/dataService.js?v=20260928-4"></script>
+<script src="js/utils.js?v=20260928-4"></script>
+<script src="js/auth.js?v=20260928-4"></script>
+<script src="js/siteContent.js?v=20260928-4"></script>
+<script src="js/blog.js?v=20260928-4"></script>
+<script src="js/legal.js?v=20260928-4"></script>
+<script src="js/products.js?v=20260928-4"></script>
+<script src="js/productMedia.js?v=20260928-4"></script>
+<script src="js/productDetail.js?v=20260928-4"></script>
+<script src="js/cart.js?v=20260928-4"></script>
+<script src="js/orders.js?v=20260928-4"></script>
+<script src="js/customerArea.js?v=20260928-4"></script>
+<script src="js/adminReports.js?v=20260928-4"></script>
+<script src="js/adminCosts.js?v=20260928-4"></script>
+<script src="js/adminPromotions.js?v=20260928-4"></script>
+<script src="js/adminPanel.js?v=20260928-4"></script>
+<script src="js/app.js?v=20260928-4"></script>
 
 </body>
 </html>

@@ -23,7 +23,7 @@
   }
 
   function orderRowHtml(order) {
-    const itemsPreview = order.items.map((i) => `${i.qty}x ${i.name}`).join(', ');
+    const itemsPreview = order.items.map((i) => `${i.qty}x ${i.name}${i.selectedColor ? ` (${i.selectedColor})` : ''}`).join(', ');
     return `
       <div class="order-card" data-id="${order.id}">
         <div class="order-card__main">

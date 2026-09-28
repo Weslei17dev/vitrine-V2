@@ -45,6 +45,7 @@ function toPublicOrder(row) {
     discountTotal: Number(row.discount_total || 0),
     automaticDiscount: Number(row.automatic_discount || 0),
     couponDiscount: Number(row.coupon_discount || 0),
+    shippingDiscount: Number(row.shipping_discount || 0),
     couponCode: row.coupon_code || null,
     shippingTotal: Number(row.shipping_total || 0),
     total: Number(row.total),
@@ -75,14 +76,19 @@ function validateCartItems(rawItems) {
     throw new V.ValidationError('O carrinho deve conter entre 1 e 50 produtos.');
   }
   const consolidated = new Map();
+  const totals = new Map();
   for (const raw of rawItems) {
     const productId = V.uuid(raw && raw.productId, 'Produto');
     const qty = V.positiveInteger(raw && raw.qty, 'Quantidade', 99);
-    consolidated.set(productId, (consolidated.get(productId) || 0) + qty);
-    if (consolidated.get(productId) > 99) throw new V.ValidationError('A quantidade máxima por produto é 99.');
+    const selectedColor = raw?.selectedColor == null || raw.selectedColor === '' ? null : V.text(raw.selectedColor, 'Cor', {max:40});
+    const key = JSON.stringify([productId, selectedColor]);
+    const entry = consolidated.get(key) || {productId, selectedColor, qty:0};
+    entry.qty += qty;
+    consolidated.set(key, entry);
+    totals.set(productId, (totals.get(productId) || 0) + qty);
+    if (totals.get(productId) > 99) throw new V.ValidationError('A quantidade máxima por produto é 99.');
   }
-  return Array.from(consolidated, ([productId, qty]) => ({ productId, qty }))
-    .sort((a, b) => a.productId.localeCompare(b.productId));
+  return Array.from(consolidated.values()).sort((a, b) => a.productId.localeCompare(b.productId) || String(a.selectedColor).localeCompare(String(b.selectedColor)));
 }
 
 function parseLimit(value, fallback, max) {
@@ -102,17 +108,17 @@ function shippingForSubtotal(content, subtotalCents) {
   return freeAboveCents > 0 && subtotalCents >= freeAboveCents ? 0 : flatCents;
 }
 
-router.post('/quote', requireAuth, orderLimiter, async (req, res, next) => {
+router.post('/quote', orderLimiter, async (req, res, next) => {
   try {
     await expirePendingOrders();
     const requestedItems = validateCartItems(req.body && req.body.items);
     const couponCode = normalizeCode(req.body && req.body.couponCode);
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await pool.query(
-      'SELECT id, name, price, category, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
+      'SELECT id, name, price, category, stock, active, colors FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
       [productIds]
     );
-    if (productsResult.rows.length !== productIds.length) throw new V.ValidationError('Um dos produtos não está mais disponível.');
+    if (productsResult.rows.length !== new Set(productIds).size) throw new V.ValidationError('Um dos produtos não está mais disponível.');
     const content = await readStoreContent();
     const calculated = await priceOrder(pool, requestedItems, productsResult.rows, couponCode,
       (subtotal) => shippingForSubtotal(content, subtotal));
@@ -123,6 +129,8 @@ router.post('/quote', requireAuth, orderLimiter, async (req, res, next) => {
       discountTotal: (calculated.automaticCents + calculated.couponCents) / 100,
       automaticDiscount: calculated.automaticCents / 100,
       couponDiscount: calculated.couponCents / 100,
+      shippingDiscount: calculated.shippingDiscountCents / 100,
+      shippingBeforeDiscount: calculated.baseShippingCents / 100,
       couponCode: calculated.coupon?.code || null,
       shippingTotal: calculated.shippingCents / 100,
       total: calculated.totalCents / 100,
@@ -181,10 +189,10 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
 
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await client.query(
-      'SELECT id, name, price, category, cost_price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+      'SELECT id, name, price, category, cost_price, stock, active, colors FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
       [productIds]
     );
-    if (productsResult.rows.length !== productIds.length) throw new V.ValidationError('Um dos produtos não está mais disponível.');
+    if (productsResult.rows.length !== new Set(productIds).size) throw new V.ValidationError('Um dos produtos não está mais disponível.');
 
     const content = await readStoreContent(client);
     const calculated = await priceOrder(client, requestedItems, productsResult.rows, couponCode,
@@ -221,15 +229,15 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
       `INSERT INTO orders (
          number, user_id, customer_name, shipping_phone, shipping_address, shipping_city, shipping_state, shipping_zip,
          items, subtotal, shipping_total, total, status, status_history, pix_payload, idempotency_key, order_date, order_time, expires_at,
-         discount_total, automatic_discount, coupon_discount, coupon_code
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+         discount_total, automatic_discount, coupon_discount, coupon_code, shipping_discount
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
        RETURNING *`,
       [
         number, user.id, user.name, user.phone, user.address, user.city, user.state, user.zip,
         JSON.stringify(canonicalItems), subtotalCents / 100, shippingCents / 100, total, JSON.stringify(history), payload,
         idempotencyKey, dateStr, timeStr, expiresAt,
         (calculated.automaticCents + calculated.couponCents) / 100, calculated.automaticCents / 100,
-        calculated.couponCents / 100, calculated.coupon?.code || null
+        calculated.couponCents / 100, calculated.coupon?.code || null, calculated.shippingDiscountCents / 100
       ]
     );
 

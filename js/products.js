@@ -288,7 +288,7 @@
     document.getElementById('catalog-clear-filters')?.addEventListener('click', () => { state.inStock = false; document.getElementById('catalog-in-stock').checked = false; openCatalog(); });
   }
 
-  function handleAddToCart(productId, quantity = 1, suppliedProduct = null) {
+  function handleAddToCart(productId, quantity = 1, suppliedProduct = null, selectedColor = null) {
     const user = global.App.state.currentUser;
     if (user?.role === 'admin') {
       Utils.showToast('Você está visualizando como administrador. Use uma conta de cliente para comprar.', 'info');
@@ -301,7 +301,12 @@
       return false;
     }
 
-    if (!global.CartModule.addItem(product, quantity)) {
+    if (product.colors?.length && !selectedColor) {
+      global.ProductDetailModule.show(product.id);
+      Utils.showToast('Selecione a cor antes de adicionar o produto.', 'info');
+      return false;
+    }
+    if (!global.CartModule.addItem(product, quantity, selectedColor)) {
       Utils.showToast('Confira o estoque e a quantidade que já está no carrinho (limite de 99 por produto e 50 produtos).', 'warning');
       return false;
     }

@@ -11,10 +11,16 @@
   };
   function updateFields() {
     const controls = form().elements;
+    const freeShipping = controls.discountType.value === 'free_shipping';
+    if (freeShipping && controls.kind.value !== 'coupon') controls.kind.value = 'coupon';
     const coupon = controls.kind.value === 'coupon';
     const scope = controls.scope.value;
-    document.querySelector('.promotion-code-field').hidden = !coupon;
-    document.querySelector('.promotion-limit-field').hidden = !coupon;
+    document.querySelector('.promotion-code-field').hidden = controls.kind.value !== 'coupon';
+    document.querySelector('.promotion-limit-field').hidden = controls.kind.value !== 'coupon';
+    document.querySelector('.promotion-value-field').hidden = freeShipping;
+    controls.value.required = !freeShipping;
+    controls.value.disabled = freeShipping;
+    controls.value.value = freeShipping ? '0' : (controls.value.value === '0' ? '' : controls.value.value);
     document.querySelector('.promotion-category-field').hidden = scope !== 'category';
     document.querySelector('.promotion-product-field').hidden = scope !== 'product';
     controls.code.required = coupon;
@@ -22,7 +28,7 @@
     controls.productId.required = scope === 'product';
     controls.value.max = controls.discountType.value === 'percent' ? '100' : '999999.99';
     document.getElementById('promotion-rule-hint').textContent = coupon
-      ? 'O cupom vale para os itens selecionados no carrinho, após os descontos automáticos. Valor fixo é abatido uma vez do pedido.'
+      ? freeShipping ? 'Cupom de frete grátis: o valor do frete é removido do pedido. Cadastre o código e escolha os produtos elegíveis.' : 'O cupom vale para os itens selecionados no carrinho, após os descontos automáticos. Valor fixo é abatido uma vez do pedido.'
       : 'Desconto automático é exibido no preço da loja. Valor fixo é abatido por unidade; se houver mais de um, vale o maior por item.';
   }
   function scopeText(rule) {
@@ -35,7 +41,7 @@
     const container = document.getElementById('admin-promotions-list');
     container.innerHTML = rules.length ? rules.map((rule) => `<article class="promotion-row" data-id="${Utils.escapeHtml(rule.id)}">
       <div><strong>${Utils.escapeHtml(rule.name)}</strong> <span class="status-pill ${rule.active ? 'status-pill--on' : 'status-pill--off'}">${rule.active ? 'Ativo' : 'Inativo'}</span>
-      <p>${rule.kind === 'coupon' ? `Cupom <code>${Utils.escapeHtml(rule.code)}</code>` : 'Desconto automático'} · ${Utils.escapeHtml(scopeText(rule))} · ${rule.discountType === 'percent' ? `${rule.value}%` : Utils.formatCurrency(rule.value)}</p>
+      <p>${rule.kind === 'coupon' ? `Cupom <code>${Utils.escapeHtml(rule.code)}</code>` : 'Desconto automático'} · ${Utils.escapeHtml(scopeText(rule))} · ${rule.discountType === 'free_shipping' ? 'Frete grátis' : rule.discountType === 'percent' ? `${rule.value}%` : Utils.formatCurrency(rule.value)}</p>
       ${rule.startsAt || rule.endsAt ? `<small>${rule.startsAt ? `Início: ${Utils.escapeHtml(formatDate(rule.startsAt))}` : 'Sem início'} · ${rule.endsAt ? `Fim: ${Utils.escapeHtml(formatDate(rule.endsAt))}` : 'Sem término'}</small>` : ''}
       ${rule.kind === 'coupon' ? `<small>Usos: ${rule.usedCount}${rule.maxUses == null ? ' (sem limite)' : ' / ' + rule.maxUses}</small>` : ''}</div>
       <div class="promotion-row__actions"><button type="button" class="btn btn--outline btn--sm" data-promotion-action="edit">Editar</button><button type="button" class="btn btn--outline btn--sm" data-promotion-action="toggle">${rule.active ? 'Desativar' : 'Ativar'}</button></div>
@@ -87,7 +93,7 @@
     const payload = {
       name:fields.name.value.trim(), kind:fields.kind.value, code:fields.code.value.trim(),
       scope:fields.scope.value, category:fields.category.value, productId:fields.productId.value,
-      discountType:fields.discountType.value, value:Number(fields.value.value), maxUses:fields.maxUses.value,
+      discountType:fields.discountType.value, value:fields.discountType.value === 'free_shipping' ? 0 : Number(fields.value.value), maxUses:fields.maxUses.value,
       startsAt:fields.startsAt.value ? new Date(fields.startsAt.value).toISOString() : null,
       endsAt:fields.endsAt.value ? new Date(fields.endsAt.value).toISOString() : null,
       active:fields.active.checked

@@ -2,17 +2,22 @@
 
 ## Para atualizar a loja existente
 
-1. No SQL Editor do Supabase, execute o arquivo completo `MIGRACAO-DESCONTOS-E-CUPONS.sql` **antes** de publicar a API. Ele cria as tabelas de descontos e registros de uso dos cupons e adiciona os valores de desconto aos pedidos. Pode ser executado novamente. Se ainda não aplicou a atualização anterior de custos, execute também `MIGRACAO-MELHORIAS-CUSTOS.sql`.
+1. No SQL Editor do Supabase, execute `MIGRACAO-DESCONTOS-E-CUPONS.sql` (se ainda não executou) e, em seguida, `MIGRACAO-FRETE-CORES.sql`, **antes** de publicar a API. As duas migrações podem ser executadas novamente. Se ainda não aplicou a atualização anterior de custos, execute também `MIGRACAO-MELHORIAS-CUSTOS.sql`.
 2. Envie os arquivos desta versão ao repositório do site, incluindo a pasta `server`.
 3. Faça o deploy da API no Render e do front-end no seu host habitual.
 4. Atualize o navegador com `Ctrl + F5`.
 5. No administrador, abra Produtos e informe o custo de aquisição de cada item. A análise fica em **Custos e lucro**.
 
-Não é necessário executar `seed`, cargas de demonstração nem recriar o banco. As migrações preservam os dados existentes. A de custos acrescenta `products.cost_price`; a de descontos cria `promotions` e `coupon_redemptions` e registra desconto e cupom em cada novo pedido.
+Não é necessário executar `seed`, cargas de demonstração nem recriar o banco. As migrações preservam os dados existentes. A de custos acrescenta `products.cost_price`; a de descontos cria `promotions` e `coupon_redemptions`; a de frete e cores adiciona `products.colors`, `orders.shipping_discount` e permite o cupom de frete grátis. Se a tarifa e o limite de frete grátis ainda estiverem zerados, configura um exemplo de R$ 14,90 e frete grátis a partir de R$ 199,00. Valores personalizados já cadastrados não são substituídos.
 
 A URL de API presente no arquivo enviado foi preservada em `js/apiConfig.js`. Mantenha suas variáveis do Render, incluindo `DATABASE_URL` com a conexão atual do banco. Nenhum deploy ou alteração no banco real foi executado durante a preparação do pacote. Publique também a pasta `server`: a busca por número precisa da API atualizada.
 
 ## Novidades desta entrega
+
+- O cupom aparece diretamente no carrinho, inclusive para visitantes. A cotação mostra subtotal, descontos, frete e total; o código aplicado acompanha a finalização após login. O checkout continua permitindo aplicar ou remover o cupom.
+- Na aba **Descontos e cupons**, o administrador pode criar um código do tipo **Frete grátis**, com elegibilidade para toda a loja, uma categoria ou um produto. O servidor valida a elegibilidade e registra o abatimento do frete no pedido.
+- O frete usa uma tarifa fixa ilustrativa e a regra de frete grátis configuradas em **Personalização → Frete**. Os valores são recalculados pelo servidor no carrinho, no checkout e ao criar o PIX. Prazo de entrega exibido é estimado; não existe integração com transportadora ou cálculo por CEP nesta versão. Antes de vender, configure os valores reais no painel.
+- O formulário do produto aceita uma cor por linha, no formato `Preto | #222222`. A página do produto exige a escolha da cor, e carrinho, confirmação e detalhes do pedido mostram a escolha. O estoque é compartilhado entre todas as cores do mesmo produto. Produtos existentes continuam sem opções até que sejam editados pelo administrador.
 
 - Ao passar o mouse sobre uma miniatura da galeria, a foto principal muda imediatamente. O clique continua funcionando no celular.
 - O menu de categorias agora tem uma coluna de itens menores, imagem menor e nenhum contador de produtos.
@@ -32,7 +37,7 @@ A URL de API presente no arquivo enviado foi preservada em `js/apiConfig.js`. Ma
 - No administrador, número do pedido clicável para abrir detalhes e novo filtro por número completo ou parcial, aceitando `000123`, `#000123` ou `123`. Pressione Enter ou clique em “Aplicar filtros”. A busca é feita no servidor antes da paginação, pode ser combinada com os demais filtros e é removida pelo botão “Limpar”.
 - Acesso “Ver loja” no painel e “Administrador” na loja preservados.
 
-Os ajustes de fotos/categorias usam os campos existentes. Os descontos exigem a migração acima. Opções de tamanho/cor, hierarquia de subcategorias e novos meios de pagamento não foram acrescentados. A revisão dos vídeos considerou os elementos visíveis; o áudio não pôde ser analisado no ambiente de trabalho.
+Os ajustes de fotos/categorias usam os campos existentes. Cupons e cores exigem as migrações acima. Opções de tamanho, hierarquia de subcategorias e novos meios de pagamento não foram acrescentados. A revisão dos vídeos considerou os elementos visíveis; o áudio não pôde ser analisado no ambiente de trabalho.
 
 ## Melhorias incluídas
 
@@ -66,6 +71,6 @@ O custo é registrado no item de cada novo pedido no momento de sua criação. M
 
 Os testes unitários da API podem ser executados com `npm ci` e `npm test` dentro de `server`. O pacote inclui os testes das novas regras de senha, filtros e custo do pedido.
 
-Na preparação desta versão passaram 19 testes unitários, testes de integração da API com PostgreSQL local (PGlite) e verificações no Chromium em desktop e celular. Foram verificados galeria, menu, cupons e descontos, valor do PIX, liberação do cupom cancelado, checkout, filtro de pedidos, filtros administrativos e custos. Isso não substitui a conferência do ambiente publicado após o deploy.
+Na preparação desta versão passaram 20 testes unitários, testes de integração da API com PostgreSQL local (PGlite) e verificações no Chromium em desktop e celular. Foram verificados galeria, menu, cupons e descontos, frete grátis, cores, valor do PIX, liberação do cupom cancelado, checkout, filtro de pedidos, filtros administrativos e custos. Isso não substitui a conferência do ambiente publicado após o deploy.
 
 O arquivo `COMO-PUBLICAR.md` continua com as instruções gerais de instalação do projeto. Para atualizar uma loja já funcionando, siga primeiro os passos deste arquivo.

@@ -23,6 +23,7 @@ function applies(rule, product) {
 }
 
 function amountCents(rule, eligibleCents) {
+  if (rule.discount_type === 'free_shipping') return 0;
   return rule.discount_type === 'percent'
     ? Math.round(eligibleCents * Number(rule.value) / 100)
     : cents(rule.value);
@@ -37,6 +38,7 @@ function priceForProduct(product, rules) {
   const originalCents = cents(product.price);
   let best = 0;
   for (const rule of rules) {
+    if (rule.discount_type === 'free_shipping') continue;
     if (applies(rule, product)) best = Math.max(best, Math.min(originalCents - 1, amountCents(rule, originalCents)));
   }
   const discount = Math.max(0, best);
@@ -66,26 +68,32 @@ async function priceOrder(database, requestedItems, products, couponCode, shippi
     return sum + (cents(original.price) - cents(item.price)) * item.qty;
   }, 0);
   let couponCents = 0;
+  let shippingDiscountCents = 0;
   if (coupon) {
     const eligible = calculated.items.filter((item) => applies(coupon, productsById.get(item.productId)));
     const eligibleCents = eligible.reduce((sum, item) => sum + cents(item.subtotal), 0);
     if (!eligibleCents) throw new ValidationError('Este cupom não se aplica aos produtos do carrinho.');
-    couponCents = Math.min(eligibleCents, calculated.subtotalCents - 1, amountCents(coupon, eligibleCents));
-    if (couponCents < 1) throw new ValidationError('Este cupom não pode reduzir mais o valor do carrinho.');
-    let allocated = 0;
-    eligible.forEach((item, index) => {
-      const part = index === eligible.length - 1 ? couponCents - allocated : Math.floor(couponCents * cents(item.subtotal) / eligibleCents);
-      item.couponDiscount = part / 100;
-      item.subtotal = (cents(item.subtotal) - part) / 100;
-      allocated += part;
-    });
+    if (coupon.discount_type !== 'free_shipping') {
+      couponCents = Math.min(eligibleCents, calculated.subtotalCents - 1, amountCents(coupon, eligibleCents));
+      if (couponCents < 1) throw new ValidationError('Este cupom não pode reduzir mais o valor do carrinho.');
+      let allocated = 0;
+      eligible.forEach((item, index) => {
+        const part = index === eligible.length - 1 ? couponCents - allocated : Math.floor(couponCents * cents(item.subtotal) / eligibleCents);
+        item.couponDiscount = part / 100;
+        item.subtotal = (cents(item.subtotal) - part) / 100;
+        allocated += part;
+      });
+    }
   }
   const subtotalCents = calculated.subtotalCents - couponCents;
-  const shippingCents = shippingForSubtotal(subtotalCents);
+  const baseShippingCents = shippingForSubtotal(subtotalCents);
+  if (coupon?.discount_type === 'free_shipping') shippingDiscountCents = baseShippingCents;
+  const shippingCents = baseShippingCents - shippingDiscountCents;
   if (subtotalCents + shippingCents > 9999999999) throw new ValidationError('O valor total do pedido ultrapassa o limite permitido.');
   return {
     items: calculated.items, subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents,
-    automaticCents, couponCents, grossSubtotalCents: calculated.subtotalCents + automaticCents, coupon
+    automaticCents, couponCents, shippingDiscountCents, baseShippingCents,
+    grossSubtotalCents: calculated.subtotalCents + automaticCents, coupon
   };
 }
 

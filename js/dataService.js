@@ -230,13 +230,13 @@
       return apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })), couponCode, expectedTotal })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode, expectedTotal })
       });
     },
     quote(items, couponCode = '') {
       return apiFetch('/api/orders/quote', {
         method: 'POST',
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })), couponCode })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode })
       });
     },
     getAll(options = {}) {
@@ -299,7 +299,7 @@
       accent: '#D99163', accentDark: '#A8673F', text: '#FDFCFA', textMuted: '#D4C9C2', dark: '#101010'
     },
     pix: { chave: '', nomeBeneficiario: '', cidadeBeneficiario: '' },
-    shipping: { flatRate: 0, freeAbove: 0, estimatedDays: 7 },
+    shipping: { flatRate: 14.90, freeAbove: 199, estimatedDays: 7 },
     hero: {
       eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
       title: 'Desejo, prazer e sedução\nem um só lugar.',

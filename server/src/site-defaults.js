@@ -6,7 +6,7 @@ const SITE_CONTENT_DEFAULTS = {
     accent: '#D99163', accentDark: '#A8673F', text: '#FDFCFA', textMuted: '#D4C9C2', dark: '#101010'
   },
   pix: { chave: '', nomeBeneficiario: '', cidadeBeneficiario: '' },
-  shipping: { flatRate: 0, freeAbove: 0, estimatedDays: 7 },
+  shipping: { flatRate: 14.90, freeAbove: 199, estimatedDays: 7 },
   hero: {
     eyebrow: 'Bem-vindo(a) à Brincar de Desejo',
     title: 'Desejo, prazer e sedução\nem um só lugar.',

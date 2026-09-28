@@ -11,6 +11,11 @@
   'use strict';
 
   let items = []; // [{ productId, name, price, icon, stock, qty }]
+  let couponCode = '';
+  let quote = null;
+  let quoteRequest = 0;
+  const itemKey = (item) => JSON.stringify([item.productId, item.selectedColor || null]);
+  const totalForProduct = (productId) => items.filter((item) => item.productId === productId).reduce((sum, item) => sum + item.qty, 0);
 
   function maxQuantity(item) {
     if (!item || item.stock == null || item.stock === '') return 99;
@@ -43,6 +48,7 @@
         icon: String(item.icon || '🛍️').slice(0, 8),
         image: Utils.safeImageSrc(item.image || ''),
         stock: Number.isInteger(parsedStock) && parsedStock >= 0 ? parsedStock : null,
+        selectedColor: item.selectedColor ? String(item.selectedColor).slice(0, 40) : null,
         qty: Math.min(qty, Number.isInteger(parsedStock) && parsedStock > 0 ? parsedStock : qty)
       };
     }).filter(Boolean);
@@ -54,8 +60,8 @@
     if (userId && global.App.state.currentUser.role === 'client') {
       const guest = sanitizeStoredItems(DataService.Cart.get(null));
       guest.forEach((item) => {
-        const existing = items.find((row) => row.productId === item.productId);
-        if (existing) existing.qty = Math.max(1, Math.min(maxQuantity(existing), existing.qty + item.qty));
+        const existing = items.find((row) => itemKey(row) === itemKey(item));
+        if (existing) existing.qty = Math.max(1, Math.min(maxQuantity(existing) - totalForProduct(item.productId) + existing.qty, existing.qty + item.qty));
         else if (items.length < 50) items.push(item);
       });
       DataService.Cart.clear(null);
@@ -64,12 +70,14 @@
     renderAll();
   }
 
-  function addItem(product, quantity = 1) {
+  function addItem(product, quantity = 1, selectedColor = null) {
     if (global.App.state.currentUser?.role === 'admin') return false;
     if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return false;
     const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
     if (stock < 1) return false;
-    const existing = items.find((i) => i.productId === product.id);
+    if (Array.isArray(product.colors) && product.colors.length && !product.colors.some((entry) => entry.name === selectedColor)) return false;
+    if (totalForProduct(product.id) + quantity > Math.min(99, stock)) return false;
+    const existing = items.find((i) => i.productId === product.id && i.selectedColor === selectedColor);
     if (existing) {
       existing.stock = stock;
       if (existing.qty + quantity > maxQuantity(existing)) return false;
@@ -83,6 +91,7 @@
         icon: product.icon,
         image: Utils.safeImageSrc(product.image || ''),
         stock,
+        selectedColor,
         qty: quantity
       });
     }
@@ -91,24 +100,26 @@
     return true;
   }
 
-  function updateQty(productId, qty) {
-    const item = items.find((i) => i.productId === productId);
+  function updateQty(key, qty) {
+    const item = items.find((i) => itemKey(i) === key);
     if (!item) return;
     const maximum = maxQuantity(item);
     if (maximum < 1) return;
-    item.qty = Math.max(1, Math.min(maximum, qty));
+    item.qty = Math.max(1, Math.min(maximum - totalForProduct(item.productId) + item.qty, qty));
     persist();
     renderAll();
   }
 
-  function removeItem(productId) {
-    items = items.filter((i) => i.productId !== productId);
+  function removeItem(key) {
+    items = items.filter((i) => itemKey(i) !== key);
     persist();
     renderAll();
   }
 
   function clear() {
     items = [];
+    couponCode = '';
+    quote = null;
     persist();
     renderAll();
   }
@@ -131,6 +142,9 @@
     items = items.map((item) => {
       const product = available.get(item.productId);
       if (!product) return null;
+      const choice = (product.colors || []).find((entry) => entry.name === item.selectedColor);
+      if ((product.colors || []).length && !choice) return null;
+      if (!(product.colors || []).length && item.selectedColor) return null;
       const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
       return {
         productId: product.id,
@@ -139,9 +153,18 @@
         icon: product.icon,
         image: Utils.safeImageSrc(product.image || ''),
         stock,
+        selectedColor: choice?.name || null,
         qty: stock > 0 ? Math.min(item.qty, stock, 99) : 1
       };
     }).filter(Boolean);
+    const used = new Map();
+    items = items.filter((item) => {
+      const left = item.stock - (used.get(item.productId) || 0);
+      if (left < 1) return false;
+      item.qty = Math.min(item.qty, left);
+      used.set(item.productId, (used.get(item.productId) || 0) + item.qty);
+      return true;
+    });
     persist();
     renderAll();
   }
@@ -164,17 +187,18 @@
       ? `<img src="${Utils.escapeHtml(image)}" alt="${Utils.escapeHtml(item.name)}">`
       : `<span>${Utils.escapeHtml(item.icon || '🛍️')}</span>`;
     return `
-      <div class="cart-item" data-id="${Utils.escapeHtml(item.productId)}">
+      <div class="cart-item" data-key="${Utils.escapeHtml(itemKey(item))}">
         <div class="cart-item__image">${visual}</div>
         <div class="cart-item__info">
           <strong>${Utils.escapeHtml(item.name)}</strong>
+          ${item.selectedColor ? `<span>Cor: ${Utils.escapeHtml(item.selectedColor)}</span>` : ''}
           <span>${Utils.formatCurrency(item.price)} / un.</span>
           ${maximum < 1 ? '<span class="cart-item__stock-warning">Indisponível no momento</span>' : ''}
         </div>
         <div class="cart-item__qty">
           <button data-action="dec" aria-label="Diminuir quantidade"><i class="fa-solid fa-minus"></i></button>
           <input type="number" min="1" max="${maximum || 1}" value="${item.qty}" data-action="set-qty" aria-label="Quantidade">
-          <button data-action="inc" aria-label="Aumentar quantidade" ${item.qty >= maximum ? 'disabled' : ''}><i class="fa-solid fa-plus"></i></button>
+          <button data-action="inc" aria-label="Aumentar quantidade" ${totalForProduct(item.productId) >= maximum ? 'disabled' : ''}><i class="fa-solid fa-plus"></i></button>
         </div>
         <div class="cart-item__subtotal">${Utils.formatCurrency(item.price * item.qty)}</div>
         <button class="cart-item__remove" data-action="remove" aria-label="Remover produto">
@@ -200,12 +224,40 @@
       list.innerHTML = items.map(cartItemRowHtml).join('');
     }
 
-    if (totalEl) totalEl.textContent = Utils.formatCurrency(getTotal());
+    if (totalEl) totalEl.textContent = quote ? Utils.formatCurrency(quote.total) : Utils.formatCurrency(getTotal());
+    const costs = document.getElementById('cart-costs');
+    if (costs) costs.innerHTML = quote ? `
+      <div><span>Produtos</span><strong>${Utils.formatCurrency(quote.grossSubtotal)}</strong></div>
+      ${quote.discountTotal ? `<div class="checkout-discount"><span>Descontos nos produtos</span><strong>− ${Utils.formatCurrency(quote.discountTotal)}</strong></div>` : ''}
+      <div><span>Frete de exemplo · ${quote.estimatedDays} dias úteis</span><strong>${quote.shippingTotal ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
+      ${quote.shippingDiscount ? `<div class="checkout-discount"><span>Cupom de frete grátis</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
+      <small class="theme-hint">Tarifa ilustrativa, editável pelo administrador.</small>` : items.length ? '<small class="theme-hint">Calculando frete e descontos…</small>' : '';
+    document.getElementById('cart-coupon-remove')?.classList.toggle('is-hidden', !couponCode);
   }
 
   function renderAll() {
+    quote = null;
     renderBadge();
     renderDrawer();
+    refreshQuote();
+  }
+
+  function refreshQuote(attempt = couponCode) {
+    const request = ++quoteRequest;
+    if (!items.length) return Promise.resolve();
+    return DataService.Orders.quote(items, attempt).then((result) => {
+      if (request !== quoteRequest) return;
+      quote = result;
+      couponCode = result.couponCode || '';
+      document.getElementById('cart-coupon-code').value = couponCode;
+      document.getElementById('cart-coupon-message').textContent = couponCode ? `Cupom ${couponCode} aplicado.` : '';
+      renderDrawer();
+    }).catch((err) => {
+      if (request !== quoteRequest) return;
+      document.getElementById('cart-coupon-message').textContent = err.message;
+      quote = null;
+      renderDrawer();
+    });
   }
 
   function checkout() {
@@ -224,7 +276,7 @@
       global.App.navigate('login');
       return;
     }
-    global.OrdersModule.openCheckout(items.map((item) => ({ ...item })));
+    global.OrdersModule.openCheckout(items.map((item) => ({ ...item })), couponCode);
   }
 
   function resumeCheckout() {
@@ -242,8 +294,8 @@
       list.addEventListener('click', (e) => {
         const row = e.target.closest('.cart-item');
         if (!row) return;
-        const id = row.dataset.id;
-        const item = items.find((i) => i.productId === id);
+        const id = row.dataset.key;
+        const item = items.find((i) => itemKey(i) === id);
         if (!item) return;
 
         if (e.target.closest('[data-action="inc"]')) updateQty(id, item.qty + 1);
@@ -255,7 +307,7 @@
         if (e.target.matches('[data-action="set-qty"]')) {
           const row = e.target.closest('.cart-item');
           const value = parseInt(e.target.value, 10) || 1;
-          updateQty(row.dataset.id, value);
+          updateQty(row.dataset.key, value);
         }
       });
     }
@@ -276,6 +328,11 @@
     if (checkoutBtn) {
       checkoutBtn.addEventListener('click', checkout);
     }
+    document.getElementById('cart-coupon-form')?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      refreshQuote(document.getElementById('cart-coupon-code').value.trim());
+    });
+    document.getElementById('cart-coupon-remove')?.addEventListener('click', () => refreshQuote(''));
   }
 
   function init() {

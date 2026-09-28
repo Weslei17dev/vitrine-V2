@@ -12,10 +12,11 @@ function validate(body) {
   const kind = String(body.kind || '');
   const scope = String(body.scope || '');
   const discountType = String(body.discountType || '');
-  if (!['automatic','coupon'].includes(kind) || !['all','category','product'].includes(scope) || !['percent','fixed'].includes(discountType)) {
+  if (!['automatic','coupon'].includes(kind) || !['all','category','product'].includes(scope) || !['percent','fixed','free_shipping'].includes(discountType)) {
     throw new V.ValidationError('Tipo de desconto ou abrangência inválido.');
   }
-  const value = V.positiveMoney(body.value, 'Valor do desconto');
+  if (discountType === 'free_shipping' && kind !== 'coupon') throw new V.ValidationError('Frete grátis precisa ser um cupom.');
+  const value = discountType === 'free_shipping' ? 0 : V.positiveMoney(body.value, 'Valor do desconto');
   if (discountType === 'percent' && value > 100) throw new V.ValidationError('O percentual não pode ultrapassar 100%.');
   const code = kind === 'coupon' ? normalizeCode(body.code) : null;
   if (kind === 'coupon' && !code) throw new V.ValidationError('Informe o código do cupom.');

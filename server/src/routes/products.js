@@ -20,6 +20,7 @@ function toPublicProduct(row) {
     category: row.category,
     icon: row.icon,
     color: row.color,
+    colors: Array.isArray(row.colors) ? row.colors : [],
     stock: row.stock,
     active: row.active,
     image: row.image,
@@ -48,6 +49,13 @@ function toProductSummary(row) {
 
 function validateProduct(body) {
   const gallery = Array.isArray(body.gallery) ? body.gallery : [];
+  const rawColors = Array.isArray(body.colors) ? body.colors : [];
+  if (rawColors.length > 12) throw new V.ValidationError('Cadastre no máximo 12 cores por produto.');
+  const colors = rawColors.map((entry) => ({
+    name: V.text(entry?.name, 'Nome da cor', {min:2,max:40}),
+    hex: V.color(entry?.hex)
+  }));
+  if (new Set(colors.map((entry) => entry.name.toLocaleLowerCase('pt-BR'))).size !== colors.length) throw new V.ValidationError('Não repita nomes de cores.');
   if (gallery.length > 6) throw new V.ValidationError('A galeria aceita no máximo 6 imagens.');
   const price = V.positiveMoney(body.price);
   const compareAtPrice = V.optionalMoney(body.compareAtPrice, 'Valor anterior');
@@ -63,6 +71,7 @@ function validateProduct(body) {
     category: V.text(body.category || 'Geral', 'Categoria', { max: 80 }),
     icon: V.text(body.icon || '🛍️', 'Ícone', { max: 8 }),
     color: V.color(body.color || '#D99163'),
+    colors,
     stock: V.nonNegativeInteger(body.stock == null ? 0 : body.stock, 'Estoque'),
     active: body.active !== false,
     image: V.imageSource(body.image, 'Imagem principal'),
@@ -146,9 +155,9 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const p = validateProduct(req.body || {});
     await pool.query('INSERT INTO categories (name,color) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [p.category, p.color]);
     const result = await pool.query(
-      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details, cost_price)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, p.costPrice]
+      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details, cost_price, colors)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14::jsonb) RETURNING *`,
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, p.costPrice, JSON.stringify(p.colors)]
     );
     await recordAudit(pool, {
       adminId: req.user.id, action: 'product.create', entityType: 'product', entityId: result.rows[0].id,
@@ -168,9 +177,9 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     const expectedUpdatedAt = V.timestamp(req.body && req.body.updatedAt);
     const result = await pool.query(
       `UPDATE products SET name=$1, description=$2, price=$3, compare_at_price=$4, category=$5, icon=$6, color=$7,
-         stock=$8, active=$9, image=$10, gallery=$11::jsonb, details=$12, cost_price=$15, updated_at=now()
+         stock=$8, active=$9, image=$10, gallery=$11::jsonb, details=$12, cost_price=$15, colors=$16::jsonb, updated_at=now()
        WHERE id=$13 AND date_trunc('milliseconds', updated_at)=date_trunc('milliseconds', $14::timestamptz) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, id, expectedUpdatedAt, p.costPrice]
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, id, expectedUpdatedAt, p.costPrice, JSON.stringify(p.colors)]
     );
     if (!result.rows[0]) {
       const exists = await pool.query('SELECT 1 FROM products WHERE id=$1', [id]);

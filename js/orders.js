@@ -25,7 +25,7 @@
       .map(
         (i) => `
         <tr>
-          <td>${Utils.escapeHtml(i.name)}</td>
+          <td>${Utils.escapeHtml(i.name)}${i.selectedColor ? `<small class="checkout-item-color">Cor: ${Utils.escapeHtml(i.selectedColor)}</small>` : ''}</td>
           <td>${i.qty}x</td>
           <td>${Utils.formatCurrency(i.subtotal ?? i.price * i.qty)}</td>
         </tr>`
@@ -63,7 +63,8 @@
         ${quote.automaticDiscount > 0 ? `<div class="checkout-discount"><span>Desconto nos produtos</span><strong>− ${Utils.formatCurrency(quote.automaticDiscount)}</strong></div>` : ''}
         ${quote.couponDiscount > 0 ? `<div class="checkout-discount"><span>Cupom ${Utils.escapeHtml(quote.couponCode)}</span><strong>− ${Utils.formatCurrency(quote.couponDiscount)}</strong></div>` : ''}
         <div><span>Subtotal</span><strong>${Utils.formatCurrency(quote.subtotal)}</strong></div>
-        <div><span>Frete${quote.estimatedDays ? ` · estimativa de ${quote.estimatedDays} dias úteis` : ''}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
+        <div><span>Frete de exemplo${quote.estimatedDays ? ` · estimativa de ${quote.estimatedDays} dias úteis` : ''}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
+        ${quote.shippingDiscount > 0 ? `<div class="checkout-discount"><span>Cupom de frete grátis</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
       </div>
       <div class="checkout-total-row"><span>Total do pedido</span><strong>${Utils.formatCurrency(quote.total)}</strong></div>
 
@@ -107,11 +108,11 @@
     });
   }
 
-  function openCheckout(items) {
+  function openCheckout(items, initialCoupon = '') {
     const idempotencyKey = global.crypto && global.crypto.randomUUID
       ? global.crypto.randomUUID()
       : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
-    pendingCheckout = { items, total: 0, idempotencyKey, couponCode:'', requestId:0 };
+    pendingCheckout = { items, total: 0, idempotencyKey, couponCode:initialCoupon, requestId:0 };
     const confirmButton = document.getElementById('confirm-order-btn');
     if (confirmButton) confirmButton.disabled = true;
     document.getElementById('checkout-step-review').classList.remove('is-hidden');
@@ -119,7 +120,7 @@
     const review = document.getElementById('checkout-review');
     if (review) review.innerHTML = '<div class="empty-state empty-state--inline"><i class="fa-solid fa-spinner fa-spin"></i><p>Conferindo estoque e frete...</p></div>';
     Utils.openModal('modal-checkout');
-    requestQuote('');
+    requestQuote(initialCoupon);
   }
 
   // --------------------------------------------------------------------------
@@ -167,7 +168,8 @@
       productId: i.productId,
       name: i.name,
       price: i.price,
-      qty: i.qty
+      qty: i.qty,
+      selectedColor: i.selectedColor || null
     }));
 
     confirmBtn.disabled = true;
@@ -298,7 +300,7 @@
       .map(
         (i) => `
         <tr>
-          <td>${Utils.escapeHtml(i.name)}</td>
+          <td>${Utils.escapeHtml(i.name)}${i.selectedColor ? `<small class="checkout-item-color">Cor: ${Utils.escapeHtml(i.selectedColor)}</small>` : ''}</td>
           <td>${i.qty}x</td>
           <td>${Utils.formatCurrency(i.price)}</td>
           <td>${Utils.formatCurrency(i.subtotal ?? i.price * i.qty)}</td>
@@ -337,6 +339,7 @@
         <span>Valor dos produtos</span><strong>${Utils.formatCurrency(order.subtotal + order.discountTotal)}</strong>
       </div>
       ${order.discountTotal > 0 ? `<div class="checkout-total-row"><span>Desconto aplicado${order.couponCode ? ` · ${Utils.escapeHtml(order.couponCode)}` : ''}</span><strong>− ${Utils.formatCurrency(order.discountTotal)}</strong></div>` : ''}
+      ${order.shippingDiscount > 0 ? `<div class="checkout-total-row"><span>Cupom de frete grátis${order.couponCode ? ` · ${Utils.escapeHtml(order.couponCode)}` : ''}</span><strong>− ${Utils.formatCurrency(order.shippingDiscount)}</strong></div>` : ''}
       <div class="checkout-total-row">
         <span>Frete</span><strong>${order.shippingTotal > 0 ? Utils.formatCurrency(order.shippingTotal) : 'Grátis'}</strong>
       </div>
