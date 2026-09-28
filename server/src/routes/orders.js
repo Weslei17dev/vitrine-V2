@@ -7,9 +7,9 @@ const { orderLimiter } = require('../security');
 const { SITE_CONTENT_DEFAULTS, deepMerge } = require('../site-defaults');
 const V = require('../validation');
 const pixPayload = require('../utils/pixPayload');
-const { calculateOrder } = require('../utils/orderCalculator');
+const { normalizeCode, priceOrder } = require('../utils/promotions');
 const config = require('../config');
-const { cancelLockedOrder, expirePendingOrders } = require('../utils/orderLifecycle');
+const { cancelLockedOrder, expirePendingOrders, releaseCoupon } = require('../utils/orderLifecycle');
 const { recordAudit } = require('../utils/audit');
 
 const router = express.Router();
@@ -42,6 +42,10 @@ function toPublicOrder(row) {
     },
     items: Array.isArray(row.items) ? row.items.map(({ unitCost, ...item }) => item) : [],
     subtotal: Number(row.subtotal) > 0 ? Number(row.subtotal) : Number(row.total),
+    discountTotal: Number(row.discount_total || 0),
+    automaticDiscount: Number(row.automatic_discount || 0),
+    couponDiscount: Number(row.coupon_discount || 0),
+    couponCode: row.coupon_code || null,
     shippingTotal: Number(row.shipping_total || 0),
     total: Number(row.total),
     status: row.status,
@@ -102,18 +106,24 @@ router.post('/quote', requireAuth, orderLimiter, async (req, res, next) => {
   try {
     await expirePendingOrders();
     const requestedItems = validateCartItems(req.body && req.body.items);
+    const couponCode = normalizeCode(req.body && req.body.couponCode);
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await pool.query(
-      'SELECT id, name, price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
+      'SELECT id, name, price, category, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
       [productIds]
     );
     if (productsResult.rows.length !== productIds.length) throw new V.ValidationError('Um dos produtos não está mais disponível.');
-    const initial = calculateOrder(requestedItems, productsResult.rows, 0);
     const content = await readStoreContent();
-    const calculated = calculateOrder(requestedItems, productsResult.rows, shippingForSubtotal(content, initial.subtotalCents));
+    const calculated = await priceOrder(pool, requestedItems, productsResult.rows, couponCode,
+      (subtotal) => shippingForSubtotal(content, subtotal));
     res.json({
       items: calculated.items.map(({ unitCost, ...item }) => item),
       subtotal: calculated.subtotalCents / 100,
+      grossSubtotal: calculated.grossSubtotalCents / 100,
+      discountTotal: (calculated.automaticCents + calculated.couponCents) / 100,
+      automaticDiscount: calculated.automaticCents / 100,
+      couponDiscount: calculated.couponCents / 100,
+      couponCode: calculated.coupon?.code || null,
       shippingTotal: calculated.shippingCents / 100,
       total: calculated.totalCents / 100,
       estimatedDays: Number(content.shipping && content.shipping.estimatedDays) || 7
@@ -133,6 +143,7 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
   try {
     await expirePendingOrders();
     const requestedItems = validateCartItems(req.body && req.body.items);
+    const couponCode = normalizeCode(req.body && req.body.couponCode);
     client = await pool.connect();
     await client.query('BEGIN');
 
@@ -170,18 +181,24 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
 
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await client.query(
-      'SELECT id, name, price, cost_price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+      'SELECT id, name, price, category, cost_price, stock, active FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
       [productIds]
     );
     if (productsResult.rows.length !== productIds.length) throw new V.ValidationError('Um dos produtos não está mais disponível.');
 
     const content = await readStoreContent(client);
-    const initial = calculateOrder(requestedItems, productsResult.rows, 0);
-    const calculated = calculateOrder(requestedItems, productsResult.rows, shippingForSubtotal(content, initial.subtotalCents));
+    const calculated = await priceOrder(client, requestedItems, productsResult.rows, couponCode,
+      (subtotal) => shippingForSubtotal(content, subtotal), { lockCoupon: true });
     const canonicalItems = calculated.items;
     const subtotalCents = calculated.subtotalCents;
     const shippingCents = calculated.shippingCents;
     const total = calculated.totalCents / 100;
+    if (req.body?.expectedTotal != null && Math.round(V.nonNegativeMoney(req.body.expectedTotal, 'Valor confirmado') * 100) !== calculated.totalCents) {
+      const error = new Error('O valor do pedido mudou. Confira o novo total antes de confirmar.');
+      error.status = 409;
+      error.code = 'quote_changed';
+      throw error;
+    }
     const sequence = await client.query("SELECT nextval('order_number_seq') AS n");
     const number = String(sequence.rows[0].n).padStart(6, '0');
     const payload = pixPayload.build({
@@ -203,15 +220,25 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
     const inserted = await client.query(
       `INSERT INTO orders (
          number, user_id, customer_name, shipping_phone, shipping_address, shipping_city, shipping_state, shipping_zip,
-         items, subtotal, shipping_total, total, status, status_history, pix_payload, idempotency_key, order_date, order_time, expires_at
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18)
+         items, subtotal, shipping_total, total, status, status_history, pix_payload, idempotency_key, order_date, order_time, expires_at,
+         discount_total, automatic_discount, coupon_discount, coupon_code
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
        RETURNING *`,
       [
         number, user.id, user.name, user.phone, user.address, user.city, user.state, user.zip,
         JSON.stringify(canonicalItems), subtotalCents / 100, shippingCents / 100, total, JSON.stringify(history), payload,
-        idempotencyKey, dateStr, timeStr, expiresAt
+        idempotencyKey, dateStr, timeStr, expiresAt,
+        (calculated.automaticCents + calculated.couponCents) / 100, calculated.automaticCents / 100,
+        calculated.couponCents / 100, calculated.coupon?.code || null
       ]
     );
+
+    if (calculated.coupon) {
+      const redeemed = await client.query('UPDATE promotions SET used_count=used_count+1 WHERE id=$1 AND (max_uses IS NULL OR used_count < max_uses) RETURNING id',[calculated.coupon.id]);
+      if (!redeemed.rows[0]) throw new V.ValidationError('O cupom atingiu seu limite de uso. Revise o pedido.');
+      await client.query('INSERT INTO coupon_redemptions(order_id,promotion_id,user_id) VALUES($1,$2,$3)',
+        [inserted.rows[0].id, calculated.coupon.id, user.id]);
+    }
 
     for (const item of canonicalItems) {
       const updated = await client.query(
@@ -432,6 +459,7 @@ router.patch('/:id/status', requireAdmin, async (req, res, next) => {
       }
       stockRestored = true;
     }
+    if (status === STATUS_CANCELLED) await releaseCoupon(client, row.id);
 
     const history = Array.isArray(row.status_history) ? [...row.status_history] : [];
     history.push({ status, at: new Date().toISOString() });

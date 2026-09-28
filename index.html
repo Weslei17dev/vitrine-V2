@@ -21,10 +21,10 @@
 <!-- Gerador de QR Code para o payload PIX calculado pela API -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 
-  <link rel="stylesheet" href="css/style.css?v=20260928-2">
-  <link rel="stylesheet" href="css/improvements.css?v=20260928-2">
-  <link rel="stylesheet" href="css/commerce.css?v=20260928-2">
-<script src="js/frameGuard.js?v=20260928-2"></script>
+  <link rel="stylesheet" href="css/style.css?v=20260928-3">
+  <link rel="stylesheet" href="css/improvements.css?v=20260928-3">
+  <link rel="stylesheet" href="css/commerce.css?v=20260928-3">
+<script src="js/frameGuard.js?v=20260928-3"></script>
 </head>
 <body>
 
@@ -622,6 +622,9 @@
         <button class="admin-nav__item" data-admin-tab="categorias">
           <i class="fa-solid fa-layer-group"></i> Categorias
         </button>
+        <button class="admin-nav__item" data-admin-tab="descontos">
+          <i class="fa-solid fa-tags"></i> Descontos e cupons
+        </button>
         <button class="admin-nav__item" data-admin-tab="avaliacoes">
           <i class="fa-solid fa-star-half-stroke"></i> Avaliações
         </button>
@@ -932,6 +935,33 @@
           <div class="panel-card__header"><div><h2><i class="fa-solid fa-layer-group"></i> Categorias da vitrine</h2><p class="theme-hint">Cadastre, ordene e escolha a imagem exibida nas barras de categoria.</p></div><button id="new-category-btn" type="button" class="btn btn--primary btn--sm"><i class="fa-solid fa-plus"></i> Nova categoria</button></div>
           <div id="admin-categories-grid" class="admin-categories-grid"></div>
         </div>
+      </div>
+
+      <!-- ---------- DESCONTOS E CUPONS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="descontos">
+        <div class="panel-card">
+          <div class="panel-card__header"><div><h2>Descontos e cupons</h2><p class="theme-hint">Descontos automáticos aparecem nos preços da loja. Cupons são aplicados pelo cliente no checkout.</p></div></div>
+          <form id="form-promotion" class="promotion-form">
+            <input name="id" type="hidden">
+            <div class="form-grid">
+              <div class="form-field"><label for="promotion-name">Nome interno</label><input id="promotion-name" name="name" required maxlength="100" placeholder="Ex.: Semana da lingerie"></div>
+              <div class="form-field"><label for="promotion-kind">Tipo</label><select id="promotion-kind" name="kind"><option value="automatic">Desconto automático</option><option value="coupon">Cupom de desconto</option></select></div>
+              <div class="form-field promotion-code-field" hidden><label for="promotion-code">Código do cupom</label><input id="promotion-code" name="code" maxlength="32" pattern="[A-Za-z0-9_-]{3,32}" autocomplete="off" placeholder="Ex.: PRESENTE10"></div>
+              <div class="form-field"><label for="promotion-scope">Aplicar em</label><select id="promotion-scope" name="scope"><option value="all">Todos os produtos</option><option value="category">Uma categoria</option><option value="product">Um produto</option></select></div>
+              <div class="form-field promotion-category-field" hidden><label for="promotion-category">Categoria</label><select id="promotion-category" name="category"></select></div>
+              <div class="form-field promotion-product-field" hidden><label for="promotion-product">Produto</label><select id="promotion-product" name="productId"></select></div>
+              <div class="form-field"><label for="promotion-discount-type">Valor do desconto</label><select id="promotion-discount-type" name="discountType"><option value="percent">Porcentagem (%)</option><option value="fixed">Valor fixo (R$)</option></select></div>
+              <div class="form-field"><label for="promotion-value">Quantidade do desconto</label><input id="promotion-value" name="value" type="number" min="0.01" max="100" step="0.01" required placeholder="Ex.: 10"></div>
+              <div class="form-field promotion-limit-field" hidden><label for="promotion-max-uses">Limite total de usos (opcional)</label><input id="promotion-max-uses" name="maxUses" type="number" min="1" max="1000000" placeholder="Sem limite"></div>
+              <div class="form-field"><label for="promotion-start">Início (opcional)</label><input id="promotion-start" name="startsAt" type="datetime-local"></div>
+              <div class="form-field"><label for="promotion-end">Término (opcional)</label><input id="promotion-end" name="endsAt" type="datetime-local"></div>
+            </div>
+            <label class="promotion-active"><input type="checkbox" name="active" checked> Desconto ativo</label>
+            <p id="promotion-rule-hint" class="theme-hint">Porcentagem aplicada por produto. Caso haja mais de um desconto automático, vale o maior desconto para cada item.</p>
+            <div class="promotion-actions"><button id="promotion-submit" class="btn btn--primary" type="submit">Criar desconto</button><button id="promotion-cancel" class="btn btn--outline is-hidden" type="button">Cancelar edição</button></div>
+          </form>
+        </div>
+        <div class="panel-card"><h2>Descontos cadastrados</h2><div id="admin-promotions-list" class="promotion-list" aria-live="polite"></div></div>
       </div>
 
       <!-- ---------- AVALIAÇÕES ---------- -->
@@ -1433,23 +1463,24 @@
 <!-- ============================================================
      SCRIPTS (ordem importa: dataService/utils primeiro, app.js por último)
 ============================================================= -->
-<script src="js/apiConfig.js?v=20260928-2"></script>
-<script src="js/dataService.js?v=20260928-2"></script>
-<script src="js/utils.js?v=20260928-2"></script>
-<script src="js/auth.js?v=20260928-2"></script>
-<script src="js/siteContent.js?v=20260928-2"></script>
-<script src="js/blog.js?v=20260928-2"></script>
-<script src="js/legal.js?v=20260928-2"></script>
-<script src="js/products.js?v=20260928-2"></script>
-<script src="js/productMedia.js?v=20260928-2"></script>
-<script src="js/productDetail.js?v=20260928-2"></script>
-<script src="js/cart.js?v=20260928-2"></script>
-<script src="js/orders.js?v=20260928-2"></script>
-<script src="js/customerArea.js?v=20260928-2"></script>
-<script src="js/adminReports.js?v=20260928-2"></script>
-<script src="js/adminCosts.js?v=20260928-2"></script>
-<script src="js/adminPanel.js?v=20260928-2"></script>
-<script src="js/app.js?v=20260928-2"></script>
+<script src="js/apiConfig.js?v=20260928-3"></script>
+<script src="js/dataService.js?v=20260928-3"></script>
+<script src="js/utils.js?v=20260928-3"></script>
+<script src="js/auth.js?v=20260928-3"></script>
+<script src="js/siteContent.js?v=20260928-3"></script>
+<script src="js/blog.js?v=20260928-3"></script>
+<script src="js/legal.js?v=20260928-3"></script>
+<script src="js/products.js?v=20260928-3"></script>
+<script src="js/productMedia.js?v=20260928-3"></script>
+<script src="js/productDetail.js?v=20260928-3"></script>
+<script src="js/cart.js?v=20260928-3"></script>
+<script src="js/orders.js?v=20260928-3"></script>
+<script src="js/customerArea.js?v=20260928-3"></script>
+<script src="js/adminReports.js?v=20260928-3"></script>
+<script src="js/adminCosts.js?v=20260928-3"></script>
+<script src="js/adminPromotions.js?v=20260928-3"></script>
+<script src="js/adminPanel.js?v=20260928-3"></script>
+<script src="js/app.js?v=20260928-3"></script>
 
 </body>
 </html>

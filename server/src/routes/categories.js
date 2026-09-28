@@ -80,6 +80,7 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     );
     if (old.rows[0].name !== category.name) {
       await pool.query('UPDATE products SET category=$1,updated_at=now() WHERE lower(category)=lower($2)', [category.name, old.rows[0].name]);
+      await pool.query("UPDATE promotions SET category=$1,updated_at=now() WHERE scope='category' AND lower(category)=lower($2)", [category.name, old.rows[0].name]);
     }
     await recordAudit(pool, { adminId: req.user.id, action: 'category.update', entityType: 'category', entityId: id, details: { name: category.name } });
     res.json(publicCategory(result.rows[0]));

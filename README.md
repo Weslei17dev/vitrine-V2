@@ -80,6 +80,8 @@ Configure `js/apiConfig.js` com `http://localhost:3000` durante o desenvolviment
 
 ## Atualizando uma instalação existente
 
+Para esta atualização de descontos e cupons, siga `LEIA-ME-ATUALIZACAO.md` e execute somente o SQL `MIGRACAO-DESCONTOS-E-CUPONS.sql` no banco já existente. Não execute `seed` para instalar esta atualização: ele altera a senha inicial do administrador. Os passos abaixo são para a manutenção/migração geral da instalação.
+
 1. Faça um backup do PostgreSQL.
 2. Publique o novo código da API.
 3. Configure todas as variáveis de `server/.env.example` no Render.

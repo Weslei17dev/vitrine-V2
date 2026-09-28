@@ -253,6 +253,7 @@
     global.OrdersModule.init();
     global.CustomerAreaModule.init();
     global.AdminPanelModule.init();
+    if (global.AdminPromotionsModule) global.AdminPromotionsModule.init();
 
     if (state.currentUser) global.CartModule.loadForCurrentUser();
 

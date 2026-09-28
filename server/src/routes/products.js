@@ -6,6 +6,7 @@ const { requireAdmin } = require('../auth-middleware');
 const V = require('../validation');
 const { recordAudit } = require('../utils/audit');
 const { adminFilters } = require('../utils/adminFilters');
+const { activeAutomatic, priceForProduct } = require('../utils/promotions');
 
 const router = express.Router();
 
@@ -109,7 +110,7 @@ router.get('/admin/:id', requireAdmin, async (req, res, next) => {
 
 router.get('/', async (req, res, next) => {
   try {
-    const result = await pool.query(`
+    const [result, rules] = await Promise.all([pool.query(`
       SELECT p.*,
         COALESCE(r.rating_average, 0) AS rating_average,
         COALESCE(r.rating_count, 0) AS rating_count
@@ -121,9 +122,9 @@ router.get('/', async (req, res, next) => {
       WHERE p.active=true
       ORDER BY p.created_at ASC
       LIMIT 500
-    `);
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
-    res.json(result.rows.map(toProductSummary));
+    `), activeAutomatic(pool)]);
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(result.rows.map((row) => toProductSummary(priceForProduct(row, rules))));
   } catch (err) {
     next(err);
   }
@@ -133,8 +134,8 @@ router.get('/:id', async (req, res, next) => {
   try {
     const row = await findProduct(req.params.id, false);
     if (!row) return res.status(404).json({ message: 'Produto não encontrado.' });
-    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=120');
-    res.json(toPublicProduct(row));
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(toPublicProduct(priceForProduct(row, await activeAutomatic(pool))));
   } catch (err) {
     next(err);
   }

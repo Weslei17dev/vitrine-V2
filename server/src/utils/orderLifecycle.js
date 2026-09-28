@@ -17,8 +17,14 @@ async function restoreStock(client, order) {
   return true;
 }
 
+async function releaseCoupon(client, orderId) {
+  const result = await client.query('DELETE FROM coupon_redemptions WHERE order_id=$1 RETURNING promotion_id', [orderId]);
+  if (result.rows[0]) await client.query('UPDATE promotions SET used_count=GREATEST(0,used_count-1) WHERE id=$1', [result.rows[0].promotion_id]);
+}
+
 async function cancelLockedOrder(client, order, reason) {
   await restoreStock(client, order);
+  await releaseCoupon(client, order.id);
   const history = Array.isArray(order.status_history) ? [...order.status_history] : [];
   history.push({ status: 'Cancelado', at: new Date().toISOString(), reason });
   const result = await client.query(
@@ -55,4 +61,4 @@ async function expirePendingOrders(limit = 100) {
   }
 }
 
-module.exports = { restoreStock, cancelLockedOrder, expirePendingOrders };
+module.exports = { restoreStock, releaseCoupon, cancelLockedOrder, expirePendingOrders };

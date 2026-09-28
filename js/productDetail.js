@@ -68,6 +68,9 @@
       btn.addEventListener('click', () => {
         setMain(Number(btn.dataset.photo));
       });
+      btn.addEventListener('pointerenter', (event) => {
+        if (event.pointerType === 'mouse') setMain(Number(btn.dataset.photo));
+      });
     });
   }
 

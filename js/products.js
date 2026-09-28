@@ -79,8 +79,7 @@
     document.getElementById('category-menu-items').innerHTML = categories.map((category) => {
       const configured = state.categories.find((row) => row.name === category);
       const image = Utils.safeImageSrc(configured?.image);
-      const count = state.all.filter((p) => p.active !== false && p.category === category).length;
-      return `<button type="button" class="category-menu-item" data-open-catalog="${Utils.escapeHtml(category)}">${image ? `<img src="${Utils.escapeHtml(image)}" alt="">` : '<span class="category-menu-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>'}<span><strong>${Utils.escapeHtml(category)}</strong><small>${count} produto${count === 1 ? '' : 's'}</small></span><span aria-hidden="true">›</span></button>`;
+      return `<button type="button" class="category-menu-item" data-open-catalog="${Utils.escapeHtml(category)}">${image ? `<img src="${Utils.escapeHtml(image)}" alt="">` : '<span class="category-menu-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>'}<span><strong>${Utils.escapeHtml(category)}</strong></span><span aria-hidden="true">›</span></button>`;
     }).join('') || '<p>As categorias aparecerão após o cadastro dos produtos.</p>';
     document.getElementById('header-category-links').innerHTML = categories.slice(0, 5).map((category) => `<button type="button" data-open-catalog="${Utils.escapeHtml(category)}" class="${state.category === category ? 'is-active' : ''}">${Utils.escapeHtml(category)}</button>`).join('');
   }

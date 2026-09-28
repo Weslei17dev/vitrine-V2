@@ -10,7 +10,7 @@
 (function (global) {
   'use strict';
 
-  let pendingCheckout = { items: [], total: 0, idempotencyKey: null };
+  let pendingCheckout = { items: [], total: 0, idempotencyKey: null, couponCode: '', requestId: 0 };
   let currentOrder = null;
 
   // --------------------------------------------------------------------------
@@ -27,7 +27,7 @@
         <tr>
           <td>${Utils.escapeHtml(i.name)}</td>
           <td>${i.qty}x</td>
-          <td>${Utils.formatCurrency(i.price * i.qty)}</td>
+          <td>${Utils.formatCurrency(i.subtotal ?? i.price * i.qty)}</td>
         </tr>`
       )
       .join('');
@@ -53,7 +53,15 @@
         <tbody>${itemsHtml}</tbody>
       </table>
 
+      <form id="checkout-coupon-form" class="checkout-coupon-form">
+        <label for="checkout-coupon-code">Cupom de desconto</label>
+        <div><input id="checkout-coupon-code" type="text" autocomplete="off" maxlength="32" placeholder="Digite seu cupom" value="${Utils.escapeHtml(quote.couponCode || '')}"><button class="btn btn--outline btn--sm" type="submit">Aplicar</button>${quote.couponCode ? '<button id="checkout-remove-coupon" class="btn btn--ghost btn--sm" type="button">Remover</button>' : ''}</div>
+      </form>
+
       <div class="checkout-costs">
+        ${quote.discountTotal > 0 ? `<div><span>Valor antes dos descontos</span><strong>${Utils.formatCurrency(quote.grossSubtotal)}</strong></div>` : ''}
+        ${quote.automaticDiscount > 0 ? `<div class="checkout-discount"><span>Desconto nos produtos</span><strong>− ${Utils.formatCurrency(quote.automaticDiscount)}</strong></div>` : ''}
+        ${quote.couponDiscount > 0 ? `<div class="checkout-discount"><span>Cupom ${Utils.escapeHtml(quote.couponCode)}</span><strong>− ${Utils.formatCurrency(quote.couponDiscount)}</strong></div>` : ''}
         <div><span>Subtotal</span><strong>${Utils.formatCurrency(quote.subtotal)}</strong></div>
         <div><span>Frete${quote.estimatedDays ? ` · estimativa de ${quote.estimatedDays} dias úteis` : ''}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
       </div>
@@ -64,13 +72,46 @@
         Confira seus dados de entrega antes de confirmar. Ao confirmar, um código PIX será gerado para pagamento.
       </p>`;
     document.getElementById('checkout-address-form').addEventListener('submit', (event) => { event.preventDefault(); confirmCheckout(); });
+    document.getElementById('checkout-coupon-form').addEventListener('submit', (event) => {
+      event.preventDefault();
+      requestQuote(document.getElementById('checkout-coupon-code').value.trim());
+    });
+    document.getElementById('checkout-remove-coupon')?.addEventListener('click', () => requestQuote(''));
+  }
+
+  function requestQuote(couponCode) {
+    const requestId = ++pendingCheckout.requestId;
+    const review = document.getElementById('checkout-review');
+    const addressForm = document.getElementById('checkout-address-form');
+    const address = addressForm ? Object.fromEntries(new FormData(addressForm)) : null;
+    const confirmButton = document.getElementById('confirm-order-btn');
+    confirmButton.disabled = true;
+    return DataService.Orders.quote(pendingCheckout.items, couponCode).then((quote) => {
+      if (requestId !== pendingCheckout.requestId) return;
+      pendingCheckout.items = quote.items;
+      pendingCheckout.couponCode = quote.couponCode || '';
+      pendingCheckout.total = quote.total;
+      renderCheckoutReview(quote.items, quote);
+      if (address) {
+        for (const [name, value] of Object.entries(address)) {
+          const input = document.getElementById('checkout-address-form').elements[name];
+          if (input) input.value = value;
+        }
+      }
+      confirmButton.disabled = false;
+    }).catch((err) => {
+      if (requestId !== pendingCheckout.requestId) return;
+      if (!address) Utils.closeModal('modal-checkout');
+      else confirmButton.disabled = false;
+      Utils.showToast(err.message, 'error');
+    });
   }
 
   function openCheckout(items) {
     const idempotencyKey = global.crypto && global.crypto.randomUUID
       ? global.crypto.randomUUID()
       : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
-    pendingCheckout = { items, total: 0, idempotencyKey };
+    pendingCheckout = { items, total: 0, idempotencyKey, couponCode:'', requestId:0 };
     const confirmButton = document.getElementById('confirm-order-btn');
     if (confirmButton) confirmButton.disabled = true;
     document.getElementById('checkout-step-review').classList.remove('is-hidden');
@@ -78,17 +119,7 @@
     const review = document.getElementById('checkout-review');
     if (review) review.innerHTML = '<div class="empty-state empty-state--inline"><i class="fa-solid fa-spinner fa-spin"></i><p>Conferindo estoque e frete...</p></div>';
     Utils.openModal('modal-checkout');
-    DataService.Orders.quote(items).then((quote) => {
-      const quotedItems = Array.isArray(quote.items) && quote.items.length ? quote.items : items;
-      pendingCheckout.items = quotedItems;
-      pendingCheckout.total = quote.total;
-      renderCheckoutReview(quotedItems, quote);
-      if (confirmButton) confirmButton.disabled = false;
-    }).catch((err) => {
-      if (confirmButton) confirmButton.disabled = false;
-      Utils.closeModal('modal-checkout');
-      Utils.showToast(err.message, 'error');
-    });
+    requestQuote('');
   }
 
   // --------------------------------------------------------------------------
@@ -144,7 +175,9 @@
 
     DataService.Orders.create({
       items: orderItems,
-      idempotencyKey: pendingCheckout.idempotencyKey
+      idempotencyKey: pendingCheckout.idempotencyKey,
+      couponCode: pendingCheckout.couponCode,
+      expectedTotal: pendingCheckout.total
     })
       .then((order) => {
         currentOrder = order;
@@ -163,7 +196,10 @@
         }
         renderPixQrCode(order);
       })
-      .catch((err) => Utils.showToast(err.message, 'error'))
+      .catch(async (err) => {
+        Utils.showToast(err.message, 'error');
+        if (err.code === 'quote_changed') await requestQuote(pendingCheckout.couponCode);
+      })
       .finally(() => {
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = '<i class="fa-solid fa-check"></i> Confirmar Pedido';
@@ -265,7 +301,7 @@
           <td>${Utils.escapeHtml(i.name)}</td>
           <td>${i.qty}x</td>
           <td>${Utils.formatCurrency(i.price)}</td>
-          <td>${Utils.formatCurrency(i.price * i.qty)}</td>
+          <td>${Utils.formatCurrency(i.subtotal ?? i.price * i.qty)}</td>
         </tr>`
       )
       .join('');
@@ -298,8 +334,9 @@
       </table>
 
       <div class="checkout-total-row">
-        <span>Subtotal</span><strong>${Utils.formatCurrency(order.subtotal)}</strong>
+        <span>Valor dos produtos</span><strong>${Utils.formatCurrency(order.subtotal + order.discountTotal)}</strong>
       </div>
+      ${order.discountTotal > 0 ? `<div class="checkout-total-row"><span>Desconto aplicado${order.couponCode ? ` · ${Utils.escapeHtml(order.couponCode)}` : ''}</span><strong>− ${Utils.formatCurrency(order.discountTotal)}</strong></div>` : ''}
       <div class="checkout-total-row">
         <span>Frete</span><strong>${order.shippingTotal > 0 ? Utils.formatCurrency(order.shippingTotal) : 'Grátis'}</strong>
       </div>

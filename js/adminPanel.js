@@ -864,7 +864,7 @@
       btn.classList.toggle('is-active', btn.dataset.adminTab === tabName);
     });
     const titles = {
-      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', categorias: 'Categorias',
+      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', categorias: 'Categorias', descontos: 'Descontos e cupons',
       relatorios: 'Relatórios', custos: 'Custos e lucratividade', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
     };
     const title = document.getElementById('admin-topbar-title');
@@ -873,6 +873,7 @@
     if (tabName === 'auditoria') loadAudit();
     if (tabName === 'relatorios' && global.AdminReportsModule) global.AdminReportsModule.onAdminTabActivated();
     if (tabName === 'custos' && global.AdminCostsModule) global.AdminCostsModule.load();
+    if (tabName === 'descontos' && global.AdminPromotionsModule) global.AdminPromotionsModule.load();
   }
 
   // ==========================================================================

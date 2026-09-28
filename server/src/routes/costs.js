@@ -10,7 +10,9 @@ WITH lines AS (
   SELECT o.created_at, item->>'productId' AS product_id,
     COALESCE(item->>'name',p.name,'Produto removido') AS name,
     CASE WHEN item->>'qty' ~ '^[0-9]{1,3}$' THEN (item->>'qty')::numeric ELSE 0 END AS qty,
-    CASE WHEN item->>'price' ~ '^[0-9]{1,8}(\\.[0-9]{1,2})?$' THEN (item->>'price')::numeric ELSE 0 END AS price,
+    CASE WHEN item->>'subtotal' ~ '^[0-9]{1,8}(\\.[0-9]{1,2})?$' THEN (item->>'subtotal')::numeric
+      ELSE (CASE WHEN item->>'price' ~ '^[0-9]{1,8}(\\.[0-9]{1,2})?$' THEN (item->>'price')::numeric ELSE 0 END)
+        * (CASE WHEN item->>'qty' ~ '^[0-9]{1,3}$' THEN (item->>'qty')::numeric ELSE 0 END) END AS revenue,
     CASE WHEN item->>'unitCost' ~ '^[0-9]{1,8}(\\.[0-9]{1,2})?$' THEN (item->>'unitCost')::numeric ELSE NULL END AS cost
   FROM orders o CROSS JOIN LATERAL jsonb_array_elements(o.items) item
   LEFT JOIN products p ON p.id::text=item->>'productId'
@@ -21,8 +23,8 @@ WITH lines AS (
     AND ($4::text IS NULL OR p.category=$4)
 )
 SELECT product_id, MAX(name) AS name, SUM(qty) AS units,
-  SUM(qty*price) AS revenue,
-  COALESCE(SUM(qty*price) FILTER(WHERE cost IS NOT NULL),0) AS covered_revenue,
+  SUM(revenue) AS revenue,
+  COALESCE(SUM(revenue) FILTER(WHERE cost IS NOT NULL),0) AS covered_revenue,
   COALESCE(SUM(qty*cost),0) AS cost,
   COALESCE(SUM(qty) FILTER(WHERE cost IS NULL),0) AS missing_units
 FROM lines GROUP BY product_id ORDER BY revenue DESC`;

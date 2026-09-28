@@ -226,17 +226,17 @@
     STATUS_FLOW,
     STATUS_CANCELLED,
 
-    create({ items, idempotencyKey }) {
+    create({ items, idempotencyKey, couponCode, expectedTotal }) {
       return apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })) })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })), couponCode, expectedTotal })
       });
     },
-    quote(items) {
+    quote(items, couponCode = '') {
       return apiFetch('/api/orders/quote', {
         method: 'POST',
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })) })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty })), couponCode })
       });
     },
     getAll(options = {}) {
@@ -270,6 +270,13 @@
     markSeenByAdmin(orderId) {
       return apiFetch(`/api/orders/${orderId}/seen`, { method: 'PATCH' });
     }
+  };
+
+  const PromotionRepository = {
+    getAll() { return apiFetch('/api/promotions'); },
+    create(payload) { return apiFetch('/api/promotions', { method:'POST', body:JSON.stringify(payload) }); },
+    update(id, payload) { return apiFetch(`/api/promotions/${id}`, { method:'PUT', body:JSON.stringify(payload) }); },
+    setActive(id, active) { return apiFetch(`/api/promotions/${id}/active`, { method:'PATCH', body:JSON.stringify({active}) }); }
   };
 
   // ============================================================================
@@ -437,6 +444,7 @@
     Categories: CategoryRepository,
     Cart: CartRepository,
     Orders: OrderRepository,
+    Promotions: PromotionRepository,
     Customers: CustomerRepository,
     SiteContent: SiteContentRepository,
     Reviews: ReviewRepository,
