@@ -16,6 +16,8 @@
   let loadedReviews = [];
   let totalReviews = 0;
   let productRequest = 0;
+  let gallerySelection = 0;
+  let selectPhoto = null;
 
   // --------------------------------------------------------------------------
   // Galeria de fotos
@@ -34,14 +36,16 @@
 
     const images = galleryImages(product);
 
-    let selected = 0;
     function setMain(index) {
-      selected = (index + images.length) % images.length;
-      mainEl.innerHTML = `<img src="${Utils.escapeHtml(images[selected])}" alt="${Utils.escapeHtml(product.name)} — foto ${selected + 1}">${images.length > 1 ? '<button type="button" class="product-media__arrow product-media__arrow--prev" data-detail-prev aria-label="Foto anterior">&#10094;</button><button type="button" class="product-media__arrow product-media__arrow--next" data-detail-next aria-label="Próxima foto">&#10095;</button>' + `<span class="product-media__count" aria-live="polite">${selected + 1} / ${images.length}</span>` : ''}`;
+      gallerySelection = (index + images.length) % images.length;
+      const selected = gallerySelection;
+      mainEl.innerHTML = `<button type="button" class="pd-zoom-open" aria-label="Ampliar foto ${selected + 1} de ${Utils.escapeHtml(product.name)}"><img src="${Utils.escapeHtml(images[selected])}" alt="${Utils.escapeHtml(product.name)} — foto ${selected + 1}"><span><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i> Ampliar foto</span></button>${images.length > 1 ? '<button type="button" class="product-media__arrow product-media__arrow--prev" data-detail-prev aria-label="Foto anterior">&#10094;</button><button type="button" class="product-media__arrow product-media__arrow--next" data-detail-next aria-label="Próxima foto">&#10095;</button>' + `<span class="product-media__count" aria-live="polite">${selected + 1} / ${images.length}</span>` : ''}`;
+      mainEl.querySelector('.pd-zoom-open').addEventListener('click', () => { renderZoom(); Utils.openModal('modal-product-zoom'); });
       mainEl.querySelector('[data-detail-prev]')?.addEventListener('click', () => { setMain(selected - 1); mainEl.querySelector('[data-detail-prev]').focus(); });
       mainEl.querySelector('[data-detail-next]')?.addEventListener('click', () => { setMain(selected + 1); mainEl.querySelector('[data-detail-next]').focus(); });
       thumbsEl.querySelectorAll('.pd-thumb').forEach((button, n) => { button.classList.toggle('is-active', n === selected); button.setAttribute('aria-pressed', String(n === selected)); });
     }
+    selectPhoto = images.length ? setMain : null;
 
     if (!images.length) {
       mainEl.innerHTML = `<div class="pd-gallery__fallback" style="background:${Utils.safeColor(product.color)}22"><span>${Utils.escapeHtml(product.icon || '🛍️')}</span></div>`;
@@ -67,16 +71,48 @@
     });
   }
 
+  function renderZoom() {
+    if (!currentProduct) return;
+    const images = galleryImages(currentProduct);
+    document.getElementById('product-zoom-image').innerHTML = `<img src="${Utils.escapeHtml(images[gallerySelection])}" alt="${Utils.escapeHtml(currentProduct.name)} — foto ${gallerySelection + 1}">`;
+    document.getElementById('product-zoom-title').textContent = currentProduct.name;
+    document.getElementById('product-zoom-count').textContent = `${gallerySelection + 1} / ${images.length}`;
+    document.getElementById('product-zoom-prev').disabled = images.length < 2;
+    document.getElementById('product-zoom-next').disabled = images.length < 2;
+  }
+
+  function updateQuantity() {
+    if (!currentProduct) return 1;
+    const input = document.getElementById('pd-quantity');
+    const stock = Math.min(99, Math.max(0, Number(currentProduct.stock) || 0));
+    const qty = Math.min(Math.max(1, Math.trunc(Number(input.value)) || 1), stock || 1);
+    input.value = qty;
+    input.max = stock || 1;
+    input.disabled = stock === 0;
+    document.getElementById('pd-quantity-less').disabled = qty <= 1 || stock === 0;
+    document.getElementById('pd-quantity-more').disabled = qty >= stock;
+    document.getElementById('pd-quantity-total').textContent = `Subtotal: ${Utils.formatCurrency(currentProduct.price * qty)}`;
+    return qty;
+  }
+
   // --------------------------------------------------------------------------
   // Informações do produto
   // --------------------------------------------------------------------------
   function renderInfo(product) {
     document.getElementById('pd-category').textContent = product.category;
+    document.getElementById('pd-breadcrumb-category').textContent = product.category;
     document.getElementById('pd-name').textContent = product.name;
     const compareAt = Number(product.compareAtPrice || 0);
     const price = Number(product.price || 0);
     document.getElementById('pd-price').innerHTML = `${compareAt > price ? `<span class="product-price-old">${Utils.formatCurrency(compareAt)}</span>` : ''}<span>${Utils.formatCurrency(price)}</span><small> à vista no PIX</small>`;
-    document.getElementById('pd-description').textContent = product.description;
+    document.getElementById('pd-description').textContent = product.description.length > 230 ? product.description.slice(0, 227) + '…' : product.description;
+    document.getElementById('pd-full-description').textContent = product.description;
+    document.getElementById('pd-stock').textContent = Number(product.stock) > 0 ? `Estoque disponível · ${product.stock} unidade${Number(product.stock) === 1 ? '' : 's'}` : 'Produto indisponível no momento';
+    document.getElementById('pd-quantity').value = 1;
+    document.getElementById('pd-cart-feedback').textContent = '';
+    document.getElementById('pd-buy-btn').disabled = Number(product.stock) <= 0;
+    document.getElementById('pd-buy-btn').textContent = Number(product.stock) <= 0 ? 'Indisponível' : 'Comprar agora';
+    updateQuantity();
 
     const detailsBlock = document.querySelector('.pd-details-block');
     if (product.details) {
@@ -109,7 +145,7 @@
   }
 
   function renderReviewsSummary(summary) {
-    const avg = summary.ratingAverage;
+    const avg = Number(summary.ratingAverage) || 0;
     document.getElementById('pd-rating-stars').innerHTML = starsHtml(avg, false);
     document.getElementById('pd-rating-summary').textContent = summary.total
       ? `${avg.toFixed(1)} de 5 · ${summary.total} ${summary.total === 1 ? 'avaliação' : 'avaliações'}`
@@ -234,7 +270,7 @@
           <span class="product-card__category">${Utils.escapeHtml(product.category)}</span>
         </div>
         <div class="product-card__body">
-          <h3>${Utils.escapeHtml(product.name)}</h3>
+          <h3><button type="button" class="product-title-link">${Utils.escapeHtml(product.name)}</button></h3>
           <p class="product-card__description">${Utils.escapeHtml(product.description)}</p>
           <div class="product-card__meta">${ratingCount ? `<span class="product-rating"><i class="fa-solid fa-star"></i> ${Number(product.ratingAverage || 0).toFixed(1)} <small>(${ratingCount})</small></span>` : '<span class="text-muted">Ainda sem avaliações</span>'}</div>
         </div>
@@ -257,6 +293,7 @@
 
     const cached = global.ProductsModule ? global.ProductsModule.getCached() : [];
     Promise.resolve(cached && cached.length ? cached : DataService.Products.getAll()).then((all) => {
+      if (currentProduct?.id !== product.id) return;
       const active = all.filter((p) => p.id !== product.id && p.active !== false);
       const sameCategory = active.filter((p) => p.category === product.category);
       let related = sameCategory.slice(0, 4);
@@ -270,7 +307,7 @@
         return;
       }
       grid.innerHTML = related.map(relatedCardHtml).join('');
-    });
+    }).catch(() => { if (currentProduct?.id === product.id) grid.innerHTML = '<p>Não foi possível carregar os produtos relacionados.</p>'; });
   }
 
   function wireRelatedClicks() {
@@ -291,8 +328,43 @@
     const addBtn = document.getElementById('pd-add-btn');
     if (!addBtn) return;
     addBtn.addEventListener('click', () => {
-      if (global.ProductsModule) global.ProductsModule.handleAddToCart(addBtn.dataset.id);
+      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct)) {
+        const feedback = document.getElementById('pd-cart-feedback');
+        feedback.innerHTML = 'Adicionado. <button type="button">Ver carrinho</button>';
+        feedback.querySelector('button').addEventListener('click', () => Utils.openModal('modal-cart'));
+      }
     });
+    document.getElementById('pd-buy-btn').addEventListener('click', () => {
+      if (currentProduct && global.ProductsModule.handleAddToCart(currentProduct.id, updateQuantity(), currentProduct)) global.CartModule.checkout();
+    });
+    document.getElementById('pd-quantity').addEventListener('change', updateQuantity);
+    [-1, 1].forEach((delta) => document.getElementById(delta < 0 ? 'pd-quantity-less' : 'pd-quantity-more').addEventListener('click', () => {
+      document.getElementById('pd-quantity').value = updateQuantity() + delta;
+      updateQuantity();
+    }));
+    document.getElementById('pd-breadcrumb-category').addEventListener('click', () => currentProduct && global.ProductsModule.openCatalog(currentProduct.category));
+    document.getElementById('pd-jump-reviews').addEventListener('click', () => document.getElementById('pd-reviews-section').scrollIntoView({behavior:'smooth'}));
+    document.getElementById('pd-share').addEventListener('click', async () => {
+      if (!currentProduct) return;
+      const url = new URL(location.href); url.searchParams.set('produto', currentProduct.id); url.hash = '';
+      try { await navigator.clipboard.writeText(url.href); Utils.showToast('Link do produto copiado.', 'success'); }
+      catch (_) { global.prompt('Copie o link do produto:', url.href); }
+    });
+    const changeZoom = (delta) => { if (selectPhoto) { selectPhoto(gallerySelection + delta); renderZoom(); } };
+    document.getElementById('product-zoom-prev').addEventListener('click', () => changeZoom(-1));
+    document.getElementById('product-zoom-next').addEventListener('click', () => changeZoom(1));
+    document.getElementById('modal-product-zoom').addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); changeZoom(event.key === 'ArrowLeft' ? -1 : 1); }
+    });
+    let touchStart = null;
+    const gallery = document.getElementById('pd-main-image');
+    gallery.addEventListener('touchstart', (event) => { touchStart = [event.touches[0].clientX, event.touches[0].clientY]; }, {passive:true});
+    gallery.addEventListener('touchend', (event) => {
+      if (!touchStart || !selectPhoto) return;
+      const dx = event.changedTouches[0].clientX - touchStart[0], dy = event.changedTouches[0].clientY - touchStart[1];
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) selectPhoto(gallerySelection + (dx < 0 ? 1 : -1));
+      touchStart = null;
+    }, {passive:true});
   }
 
   // --------------------------------------------------------------------------
@@ -300,9 +372,12 @@
   // --------------------------------------------------------------------------
   function render(productId) {
     const sequence = ++productRequest;
+    currentProduct = null;
+    document.getElementById('pd-content').hidden = true;
+    document.getElementById('pd-loading').hidden = false;
     DataService.Products.getById(productId)
       .then((product) => {
-        if (sequence !== productRequest) return;
+        if (sequence !== productRequest || global.App.getCurrentView() !== 'product-detail') return;
         currentProduct = product;
         document.title = `${product.name} — Brincar de Desejo`;
         setSelectedRating(5);
@@ -311,10 +386,15 @@
 
         renderGallery(product);
         renderInfo(product);
+        renderReviewsSummary({ratingAverage:product.ratingAverage, total:product.ratingCount || 0});
+        document.getElementById('pd-reviews-list').innerHTML = '<p>Carregando avaliações…</p>';
+        document.getElementById('pd-content').hidden = false;
+        document.getElementById('pd-loading').hidden = true;
         renderRelated(product);
         return loadReviews(product.id);
       })
       .catch(() => {
+        if (sequence !== productRequest || global.App.getCurrentView() !== 'product-detail') return;
         Utils.showToast('Não foi possível carregar este produto.', 'error');
         global.App.navigate('store');
       });
@@ -322,6 +402,8 @@
 
   function show(productId) {
     global.App.navigate('product-detail');
+    const url = new URL(location.href); url.searchParams.set('produto', productId); url.hash = '';
+    history.replaceState(null, '', url);
     render(productId);
   }
 

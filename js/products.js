@@ -2,7 +2,7 @@
    products.js
    ----------------------------------------------------------------------------
    Catálogo de produtos: listagem, filtro por categoria, busca por nome e
-   ação de "Adicionar ao Carrinho" (bloqueada para visitantes não logados).
+   ação de "Adicionar ao Carrinho" para visitantes e clientes.
    ============================================================================ */
 
 (function (global) {
@@ -13,7 +13,9 @@
     categories: [],
     category: 'Todos',
     search: '',
-    catalogSearch: ''
+    catalogSearch: '',
+    sort: 'recommended',
+    inStock: false
   };
   let loadPromise = null;
 
@@ -53,11 +55,33 @@
 
     renderCategoryNavigation(categories.slice(1));
     renderCatalogPageFilters(categories);
-    const select = document.getElementById('nav-category-select');
-    if (select) {
-      select.innerHTML = categories.map((category) => `<option value="${Utils.escapeHtml(category)}">${category === 'Todos' ? 'Todas as categorias' : Utils.escapeHtml(category)}</option>`).join('');
-      select.value = state.category;
-    }
+    renderHeaderCategories(categoryNames);
+  }
+
+  function setCategoryMenu(open, restoreFocus = false) {
+    document.getElementById('category-menu-panel').hidden = !open;
+    document.getElementById('category-menu-toggle').setAttribute('aria-expanded', String(open));
+    if (restoreFocus) document.getElementById('category-menu-toggle').focus();
+  }
+
+  function openCatalog(category = 'Todos', search = '') {
+    state.category = category;
+    state.catalogSearch = search;
+    document.getElementById('catalog-page-search').value = search;
+    document.getElementById('header-search').value = search;
+    setCategoryMenu(false);
+    renderCategoryFilters(); renderGrid(); renderCatalogPage();
+    global.App.navigate('catalog');
+  }
+
+  function renderHeaderCategories(categories) {
+    document.getElementById('category-menu-items').innerHTML = categories.map((category) => {
+      const configured = state.categories.find((row) => row.name === category);
+      const image = Utils.safeImageSrc(configured?.image);
+      const count = state.all.filter((p) => p.active !== false && p.category === category).length;
+      return `<button type="button" class="category-menu-item" data-open-catalog="${Utils.escapeHtml(category)}">${image ? `<img src="${Utils.escapeHtml(image)}" alt="">` : '<span class="category-menu-icon"><i class="fa-solid fa-layer-group" aria-hidden="true"></i></span>'}<span><strong>${Utils.escapeHtml(category)}</strong><small>${count} produto${count === 1 ? '' : 's'}</small></span><span aria-hidden="true">›</span></button>`;
+    }).join('') || '<p>As categorias aparecerão após o cadastro dos produtos.</p>';
+    document.getElementById('header-category-links').innerHTML = categories.slice(0, 5).map((category) => `<button type="button" data-open-catalog="${Utils.escapeHtml(category)}" class="${state.category === category ? 'is-active' : ''}">${Utils.escapeHtml(category)}</button>`).join('');
   }
 
   const CATEGORY_ICONS = [
@@ -146,7 +170,7 @@
           ${discountBadgeHtml(product)}
         </div>
         <div class="product-card__body">
-          <h3>${Utils.escapeHtml(product.name)}</h3>
+          <h3><button type="button" class="product-title-link" data-product-open="${Utils.escapeHtml(product.id)}">${Utils.escapeHtml(product.name)}</button></h3>
           <p class="product-card__description">${Utils.escapeHtml(product.description)}</p>
           <div class="product-card__meta">${ratingHtml(product)}</div>
         </div>
@@ -176,11 +200,11 @@
         </div>
         <div class="featured-card__body">
           <span class="featured-card__category">${Utils.escapeHtml(product.category)}</span>
-          <h3>${Utils.escapeHtml(product.name)}</h3>
+          <h3><button type="button" class="product-title-link" data-product-open="${Utils.escapeHtml(product.id)}">${Utils.escapeHtml(product.name)}</button></h3>
           <div class="featured-card__meta">${ratingHtml(product)}</div>
           <div class="featured-card__footer">
             ${pricingHtml(product, 'featured-card')}
-            <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${Utils.escapeHtml(product.id)}" ${Number(product.stock) <= 0 ? 'disabled' : ''}>
+            <button class="btn btn--primary btn--sm" data-action="add-to-cart" data-id="${Utils.escapeHtml(product.id)}" aria-label="Adicionar ${Utils.escapeHtml(product.name)} ao carrinho" ${Number(product.stock) <= 0 ? 'disabled' : ''}>
               <i class="fa-solid fa-cart-plus"></i>
             </button>
           </div>
@@ -247,38 +271,42 @@
   function renderCatalogPage() {
     const grid = document.getElementById('catalog-page-grid');
     if (!grid) return;
-    const term = state.catalogSearch.toLowerCase();
+    const normalize = (text) => String(text).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const term = normalize(state.catalogSearch);
     const list = state.all.filter((product) => {
       const categoryMatches = state.category === 'Todos' || product.category === state.category;
-      const textMatches = `${product.name} ${product.description || ''} ${product.category || ''}`.toLowerCase().includes(term);
-      return product.active !== false && categoryMatches && textMatches;
+      const textMatches = normalize(`${product.name} ${product.description || ''} ${product.category || ''}`).includes(term);
+      return product.active !== false && categoryMatches && textMatches && (!state.inStock || Number(product.stock) > 0);
     });
+    const sorts = { 'price-asc': (a,b) => a.price-b.price, 'price-desc': (a,b) => b.price-a.price, rating: (a,b) => (b.ratingAverage || 0)-(a.ratingAverage || 0), name: (a,b) => a.name.localeCompare(b.name,'pt-BR') };
+    if (sorts[state.sort]) list.sort(sorts[state.sort]);
     const result = document.getElementById('catalog-page-results');
-    if (result) result.textContent = `${list.length} produto(s) encontrado(s)`;
+    if (result) result.textContent = `${list.length} produto${list.length === 1 ? '' : 's'}${state.category !== 'Todos' ? ' em ' + state.category : ''}${state.catalogSearch ? ' para “' + state.catalogSearch + '”' : ''}`;
     grid.innerHTML = list.length
       ? list.map(productCardHtml).join('')
-      : '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>Nenhum produto encontrado.</p></div>';
+      : '<div class="empty-state"><i class="fa-solid fa-box-open"></i><p>Nenhum produto encontrado. Tente outro termo ou categoria.</p><button class="btn btn--outline" type="button" id="catalog-clear-filters">Limpar filtros</button></div>';
+    document.getElementById('catalog-clear-filters')?.addEventListener('click', () => { state.inStock = false; document.getElementById('catalog-in-stock').checked = false; openCatalog(); });
   }
 
-  function handleAddToCart(productId) {
+  function handleAddToCart(productId, quantity = 1, suppliedProduct = null) {
     const user = global.App.state.currentUser;
-    if (!user || user.role !== 'client') {
-      Utils.showToast('Entre ou crie uma conta para adicionar produtos ao carrinho.', 'info');
-      global.App.navigate('login');
-      return;
+    if (user?.role === 'admin') {
+      Utils.showToast('Você está visualizando como administrador. Use uma conta de cliente para comprar.', 'info');
+      return false;
     }
-    const product = state.all.find((p) => p.id === productId);
-    if (!product) return;
+    const product = suppliedProduct || state.all.find((p) => p.id === productId);
+    if (!product) return false;
     if (Number(product.stock) <= 0) {
       Utils.showToast('Este produto está sem estoque no momento.', 'warning');
-      return;
+      return false;
     }
 
-    if (!global.CartModule.addItem(product)) {
-      Utils.showToast('A quantidade disponível deste produto já está no carrinho.', 'warning');
-      return;
+    if (!global.CartModule.addItem(product, quantity)) {
+      Utils.showToast('Confira o estoque e a quantidade que já está no carrinho (limite de 99 por produto e 50 produtos).', 'warning');
+      return false;
     }
     Utils.showToast(`${product.name} adicionado ao carrinho.`, 'success');
+    return true;
   }
 
   function wireSearch() {
@@ -341,12 +369,19 @@
   }
 
   function init() {
-    document.getElementById('nav-category-select')?.addEventListener('change', (event) => {
-      state.category = event.target.value;
-      state.catalogSearch = '';
-      document.getElementById('catalog-page-search').value = '';
-      renderCategoryFilters(); renderGrid(); renderCatalogPage(); global.App.navigate('catalog');
+    document.getElementById('category-menu-toggle').addEventListener('click', () => setCategoryMenu(document.getElementById('category-menu-panel').hidden));
+    document.getElementById('category-menu-close').addEventListener('click', () => setCategoryMenu(false, true));
+    document.addEventListener('click', (event) => {
+      const category = event.target.closest('[data-open-catalog]');
+      if (category) openCatalog(category.dataset.openCatalog);
+      else if (!event.target.closest('.category-menu')) setCategoryMenu(false);
     });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !document.getElementById('category-menu-panel').hidden) setCategoryMenu(false, true);
+    });
+    document.getElementById('header-search-form').addEventListener('submit', (event) => { event.preventDefault(); openCatalog('Todos', document.getElementById('header-search').value.trim()); });
+    document.getElementById('catalog-sort').addEventListener('change', (event) => { state.sort = event.target.value; renderCatalogPage(); });
+    document.getElementById('catalog-in-stock').addEventListener('change', (event) => { state.inStock = event.target.checked; renderCatalogPage(); });
     wireSearch();
     wireGridClicks();
     wireFeaturedClicks();
@@ -361,6 +396,7 @@
     loadAndRender,
     getCached: () => state.all,
     getById,
+    openCatalog,
     handleAddToCart
   };
 })(window);

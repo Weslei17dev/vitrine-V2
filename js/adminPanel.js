@@ -18,6 +18,7 @@
   const PAGE_SIZE = 100;
   let cachedOrders = [];
   let orderFilters = {};
+  let ordersRequest = 0;
   let cachedCustomers = [];
   const listFilters = { products: {}, customers: {}, reviews: {} };
   const listRequests = { products: 0, customers: 0, reviews: 0 };
@@ -126,7 +127,7 @@
     const isNew = recentlyNewIds.has(order.id);
     return `
       <tr data-id="${order.id}" class="${isNew ? 'row-highlight' : ''}">
-        <td><strong>#${order.number}</strong></td>
+        <td><button type="button" class="order-number-link" data-action="view-order" data-id="${order.id}" aria-label="Abrir pedido ${Utils.escapeHtml(order.number)}">#${Utils.escapeHtml(order.number)}</button></td>
         <td>${Utils.escapeHtml(order.customerName)}</td>
         <td class="cell-truncate" title="${Utils.escapeHtml(itemsPreview)}">${Utils.escapeHtml(itemsPreview)}</td>
         <td>${Utils.formatCurrency(order.total)}</td>
@@ -134,7 +135,7 @@
         <td>${Utils.escapeHtml(order.time)}</td>
         <td>${statusSelectHtml(order)}</td>
         <td>
-          <button class="btn btn--outline btn--sm" data-action="view-order" data-id="${order.id}">
+          <button class="btn btn--outline btn--sm" data-action="view-order" data-id="${order.id}" aria-label="Ver detalhes do pedido ${Utils.escapeHtml(order.number)}">
             <i class="fa-solid fa-eye"></i>
           </button>
         </td>
@@ -154,7 +155,8 @@
     }
 
     if (!orders.length) {
-      tbody.innerHTML = `<tr><td colspan="8" class="empty-cell">Nenhum pedido realizado ainda.</td></tr>`;
+      const filtered = Object.values(orderFilters).some((value) => value !== '' && value != null);
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-cell">${filtered ? 'Nenhum pedido encontrado com estes filtros. Tente outro número ou limpe os filtros.' : 'Nenhum pedido realizado ainda.'}</td></tr>`;
       return;
     }
 
@@ -915,12 +917,14 @@
   // CARREGAMENTO GERAL
   // ==========================================================================
   function loadAll() {
+    const request = ++ordersRequest;
     return Promise.all([
       DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }),
       loadCustomers(),
       DataService.Orders.getAdminSummary()
     ]).then(
       ([orders, customers, summary]) => {
+        if (request !== ordersRequest) return;
         cachedOrders = orders;
         if (!Object.values(orderFilters).some((value) => value !== '' && value != null)) checkForNewOrders(orders);
         renderDashboard(summary);
@@ -931,20 +935,24 @@
     ).catch((err) => Utils.showToast(err.message, 'error'));
   }
 
-  function loadOrdersOnly() {
+  function loadOrdersOnly({ showErrors = false } = {}) {
+    const request = ++ordersRequest;
     return Promise.all([DataService.Orders.getAll({ limit: PAGE_SIZE, offset: 0, ...orderFilters }), DataService.Orders.getAdminSummary()]).then(([orders, summary]) => {
+      if (request !== ordersRequest) return;
       if (!Object.values(orderFilters).some((value) => value !== '' && value != null)) checkForNewOrders(orders);
       cachedOrders = orders;
       renderDashboard(summary);
       renderOrdersTable(cachedOrders);
       document.getElementById('admin-orders-load-more')?.classList.toggle('is-hidden', orders.length < PAGE_SIZE);
-    }).catch(() => {});
+    }).catch((err) => { if (showErrors && request === ordersRequest) Utils.showToast(err.message, 'error'); });
   }
 
   function loadMoreOrders() {
+    const request = ++ordersRequest;
     const button = document.getElementById('admin-orders-load-more');
     if (button) button.disabled = true;
     return DataService.Orders.getAll({ limit: PAGE_SIZE, offset: cachedOrders.length, ...orderFilters }).then((orders) => {
+      if (request !== ordersRequest) return;
       const known = new Set(cachedOrders.map((order) => order.id));
       cachedOrders.push(...orders.filter((order) => !known.has(order.id)));
       renderOrdersTable(cachedOrders);
@@ -1062,12 +1070,12 @@
     document.getElementById('admin-orders-filters')?.addEventListener('submit', (event) => {
       event.preventDefault();
       orderFilters = readOrderFilters();
-      loadOrdersOnly().catch(() => {});
+      loadOrdersOnly({ showErrors: true });
     });
     document.getElementById('admin-orders-clear-filters')?.addEventListener('click', () => {
       document.getElementById('admin-orders-filters')?.reset();
       orderFilters = {};
-      loadOrdersOnly().catch(() => {});
+      loadOrdersOnly({ showErrors: true });
     });
     document.getElementById('admin-customers-load-more')?.addEventListener('click', loadMoreCustomers);
 

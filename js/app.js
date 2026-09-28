@@ -128,6 +128,9 @@
     if (currentView === 'admin') global.AdminPanelModule.stopPolling();
 
     currentView = view;
+    if (view !== 'product-detail' && new URL(location.href).searchParams.has('produto')) {
+      const url = new URL(location.href); url.searchParams.delete('produto'); history.replaceState(null, '', url);
+    }
 
     Object.values(VIEW_IDS).forEach((id) => {
       const el = document.getElementById(id);
@@ -267,7 +270,11 @@
 
     // Clientes e visitantes abrem a loja. O administrador continua entrando
     // direto no painel, mas agora pode alternar entre painel e vitrine.
-    navigate(state.currentUser?.role === 'admin' ? 'admin' : 'store');
+    const productId = new URL(location.href).searchParams.get('produto');
+    if (productId && /^[0-9a-f-]{36}$/i.test(productId)) {
+      global.ProductsModule.loadAndRender().catch(() => {});
+      global.ProductDetailModule.show(productId);
+    } else navigate(state.currentUser?.role === 'admin' ? 'admin' : 'store');
   }
 
   global.App = { state, navigate, setCurrentUser, getCurrentView: () => currentView };

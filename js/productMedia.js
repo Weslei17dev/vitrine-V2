@@ -2,7 +2,7 @@
   'use strict';
   const galleries = new Map();
   function images(product) {
-    return [...new Set([product.image, ...(product.gallery || [])].map(Utils.safeImageSrc).filter(Boolean))];
+    return [...new Set([product.image, ...(Array.isArray(product.gallery) ? product.gallery : [])].map(Utils.safeImageSrc).filter(Boolean))];
   }
   function render(product) {
     const list = images(product);

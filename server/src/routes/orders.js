@@ -243,6 +243,7 @@ router.get('/', requireAdmin, async (req, res, next) => {
     const values = [];
     const where = [];
     const add = (value) => { values.push(value); return `$${values.length}`; };
+    const number = String(req.query.number || '').trim().replace(/^#\s*/, '').slice(0, 64);
     const client = String(req.query.client || '').trim().slice(0, 120);
     const product = String(req.query.product || '').trim().slice(0, 160);
     const status = String(req.query.status || '').trim();
@@ -255,6 +256,7 @@ router.get('/', requireAdmin, async (req, res, next) => {
       if (!ALL_STATUSES.has(status)) throw new V.ValidationError('Status de filtro inválido.');
       where.push(`status=${add(status)}`);
     }
+    if (number) where.push(`strpos(lower(number), lower(${add(number)})) > 0`);
     if (client) where.push(`customer_name ILIKE ${add(`%${client}%`)}`);
     if (product) where.push(`EXISTS (SELECT 1 FROM jsonb_array_elements(items) item WHERE item->>'name' ILIKE ${add(`%${product}%`)})`);
     if (from) {

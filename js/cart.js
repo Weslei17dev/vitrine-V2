@@ -3,8 +3,8 @@
    ----------------------------------------------------------------------------
    Carrinho de compras: adicionar, alterar quantidade, remover, calcular
    subtotal/total, limpar e acionar a finalização do pedido.
-   O carrinho é persistido por usuário (DataService.Cart) para sobreviver a
-   um refresh de página enquanto o cliente estiver logado.
+   O carrinho é persistido para visitantes e clientes (DataService.Cart),
+   com junção dos itens quando o visitante entra na conta.
    ============================================================================ */
 
 (function (global) {
@@ -25,7 +25,6 @@
 
   function persist() {
     const userId = currentUserId();
-    if (!userId) return;
     DataService.Cart.save(userId, items);
   }
 
@@ -51,26 +50,32 @@
 
   function loadForCurrentUser() {
     const userId = currentUserId();
-    if (!userId) {
-      items = [];
-      renderAll();
-      return;
-    }
     items = sanitizeStoredItems(DataService.Cart.get(userId));
+    if (userId && global.App.state.currentUser.role === 'client') {
+      const guest = sanitizeStoredItems(DataService.Cart.get(null));
+      guest.forEach((item) => {
+        const existing = items.find((row) => row.productId === item.productId);
+        if (existing) existing.qty = Math.max(1, Math.min(maxQuantity(existing), existing.qty + item.qty));
+        else if (items.length < 50) items.push(item);
+      });
+      DataService.Cart.clear(null);
+    }
     persist();
     renderAll();
   }
 
-  function addItem(product) {
-    if (!currentUserId()) return false;
+  function addItem(product, quantity = 1) {
+    if (global.App.state.currentUser?.role === 'admin') return false;
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 99) return false;
     const stock = Math.max(0, Number.parseInt(product.stock, 10) || 0);
     if (stock < 1) return false;
     const existing = items.find((i) => i.productId === product.id);
     if (existing) {
       existing.stock = stock;
-      if (existing.qty >= maxQuantity(existing)) return false;
-      existing.qty += 1;
+      if (existing.qty + quantity > maxQuantity(existing)) return false;
+      existing.qty += quantity;
     } else {
+      if (quantity > Math.min(99, stock) || items.length >= 50) return false;
       items.push({
         productId: product.id,
         name: product.name,
@@ -78,7 +83,7 @@
         icon: product.icon,
         image: Utils.safeImageSrc(product.image || ''),
         stock,
-        qty: 1
+        qty: quantity
       });
     }
     persist();
@@ -203,6 +208,31 @@
     renderDrawer();
   }
 
+  function checkout() {
+    if (global.App.state.currentUser?.role === 'admin') {
+      Utils.showToast('Use uma conta de cliente para realizar uma compra. Seu acesso administrativo será preservado.', 'info');
+      return;
+    }
+    if (!items.length) { Utils.showToast('Seu carrinho está vazio.', 'warning'); return; }
+    if (items.some((item) => maxQuantity(item) < 1)) {
+      Utils.showToast('Remova os produtos indisponíveis antes de finalizar.', 'warning'); return;
+    }
+    Utils.closeModal('modal-cart');
+    if (!global.App.state.currentUser) {
+      sessionStorage.setItem('vitrine:resume-checkout', '1');
+      Utils.showToast('Seu carrinho foi salvo. Entre ou crie uma conta para continuar a compra.', 'info');
+      global.App.navigate('login');
+      return;
+    }
+    global.OrdersModule.openCheckout(items.map((item) => ({ ...item })));
+  }
+
+  function resumeCheckout() {
+    if (sessionStorage.getItem('vitrine:resume-checkout') !== '1') return;
+    sessionStorage.removeItem('vitrine:resume-checkout');
+    if (global.App.state.currentUser?.role === 'client' && items.length) checkout();
+  }
+
   // --------------------------------------------------------------------------
   // Eventos
   // --------------------------------------------------------------------------
@@ -244,24 +274,7 @@
 
     const checkoutBtn = document.getElementById('go-checkout-btn');
     if (checkoutBtn) {
-      checkoutBtn.addEventListener('click', () => {
-        if (!items.length) {
-          Utils.showToast('Seu carrinho está vazio.', 'warning');
-          return;
-        }
-        if (items.some((item) => maxQuantity(item) < 1)) {
-          Utils.showToast('Remova os produtos indisponíveis antes de finalizar.', 'warning');
-          return;
-        }
-        if (!global.App.state.currentUser) {
-          Utils.closeModal('modal-cart');
-          Utils.showToast('Seu carrinho foi salvo. Entre ou crie uma conta para finalizar.', 'info');
-          global.App.navigate('login');
-          return;
-        }
-        Utils.closeModal('modal-cart');
-        global.OrdersModule.openCheckout(items);
-      });
+      checkoutBtn.addEventListener('click', checkout);
     }
   }
 
@@ -272,6 +285,8 @@
 
   global.CartModule = {
     init,
+    checkout,
+    resumeCheckout,
     addItem,
     updateQty,
     removeItem,

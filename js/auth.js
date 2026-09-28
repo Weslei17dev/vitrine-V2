@@ -63,6 +63,7 @@
         } else {
           global.App.navigate('store');
         }
+        global.CartModule.resumeCheckout();
       })
       .catch((err) => {
         Utils.showToast(err.message, 'error');
@@ -121,6 +122,7 @@
         form.reset();
         Utils.showToast('Conta criada com sucesso! Você já está logado.', 'success');
         global.App.navigate('store');
+        global.CartModule.resumeCheckout();
       })
       .catch((err) => {
         Utils.showToast(err.message, 'error');

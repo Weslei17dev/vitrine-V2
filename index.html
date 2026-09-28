@@ -23,6 +23,7 @@
 
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/improvements.css">
+  <link rel="stylesheet" href="css/commerce.css">
 <script src="js/frameGuard.js"></script>
 </head>
 <body>
@@ -38,23 +39,35 @@
       <span class="brand__name">Brincar de Desejo</span>
     </a>
 
-    <nav id="header-nav-links" class="header-nav">
-      <select id="nav-category-select" aria-label="Ver produtos de uma categoria"><option value="Todos">Todas as categorias</option></select>
+    <form id="header-search-form" class="commerce-search" role="search">
+      <input id="header-search" type="search" placeholder="O que você está procurando?" aria-label="Buscar produtos na loja" autocomplete="off">
+      <button type="submit" aria-label="Buscar"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i></button>
+    </form>
+    <nav id="header-nav-links" class="header-nav" aria-label="Navegação da loja">
+      <div class="category-menu">
+        <button type="button" id="category-menu-toggle" aria-expanded="false" aria-controls="category-menu-panel"><i class="fa-solid fa-bars" aria-hidden="true"></i> Categorias <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></button>
+        <div id="category-menu-panel" class="category-menu-panel" hidden>
+          <div class="category-menu-heading"><strong>Explore a loja</strong><button type="button" id="category-menu-close" aria-label="Fechar categorias">×</button></div>
+          <div id="category-menu-items"></div>
+          <button type="button" class="category-menu-all" data-open-catalog="Todos">Ver todos os produtos <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div id="header-category-links" class="header-category-links"></div>
       <a href="#" data-nav="blog"><i class="fa-solid fa-book-open"></i> Blog</a>
       <a href="#" data-nav="customer-orders" id="nav-my-orders" class="is-hidden"><i class="fa-solid fa-receipt"></i> Meus Pedidos</a>
     </nav>
 
     <div class="header-actions">
+      <button id="open-cart-btn" class="icon-btn" aria-label="Abrir carrinho">
+        <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+        <span id="cart-count-badge" class="count-badge is-hidden">0</span>
+      </button>
       <div id="header-guest-actions" class="header-guest-actions">
         <button class="btn btn--ghost btn--sm" data-action="go-login">Entrar</button>
         <button class="btn btn--primary btn--sm" data-action="go-register">Criar Conta</button>
       </div>
 
       <div id="header-client-actions" class="header-client-actions is-hidden">
-        <button id="open-cart-btn" class="icon-btn" aria-label="Abrir carrinho">
-          <i class="fa-solid fa-cart-shopping"></i>
-          <span id="cart-count-badge" class="count-badge is-hidden">0</span>
-        </button>
         <button id="header-profile-btn" class="user-chip" type="button" aria-label="Abrir meu perfil">
           <span id="header-user-avatar" class="user-avatar user-avatar--header"><i class="fa-solid fa-user"></i></span>
           <span id="header-user-name">Cliente</span>
@@ -381,7 +394,11 @@
       <div class="store-hero__search"><i class="fa-solid fa-magnifying-glass"></i><input id="catalog-page-search" type="search" placeholder="Buscar produto..." aria-label="Buscar no catálogo completo"></div>
     </header>
     <div id="catalog-page-category-filters" class="chip-list"></div>
-    <div id="catalog-page-results" class="catalog-page__results"></div>
+    <div class="catalog-toolbar">
+      <div id="catalog-page-results" class="catalog-page__results" aria-live="polite"></div>
+      <label><input id="catalog-in-stock" type="checkbox"> Somente disponíveis</label>
+      <label>Ordenar por <select id="catalog-sort"><option value="recommended">Destaques</option><option value="price-asc">Menor preço</option><option value="price-desc">Maior preço</option><option value="rating">Melhor avaliação</option><option value="name">Nome: A–Z</option></select></label>
+    </div>
     <div id="catalog-page-grid" class="product-grid product-grid--catalog"></div>
   </div>
 </section>
@@ -428,7 +445,9 @@
 ============================================================= -->
 <section id="view-product-detail" class="view">
   <div class="page-container pd-page">
-    <button class="pd-back-link" data-nav="store"><i class="fa-solid fa-arrow-left"></i> Voltar aos produtos</button>
+    <nav class="pd-breadcrumb" aria-label="Caminho do produto"><button data-nav="store">Início</button><span aria-hidden="true">/</span><button data-nav="catalog">Produtos</button><span aria-hidden="true">/</span><button id="pd-breadcrumb-category"></button></nav>
+    <div id="pd-loading" class="pd-loading" role="status" hidden>Carregando detalhes do produto…</div>
+    <div id="pd-content">
 
     <div class="pd-layout">
       <div class="pd-gallery">
@@ -440,27 +459,35 @@
         <span class="pd-info__category" id="pd-category"></span>
         <h1 id="pd-name"></h1>
 
-        <div class="pd-info__rating">
+        <button type="button" class="pd-info__rating" id="pd-jump-reviews">
           <span class="pd-stars" id="pd-rating-stars"></span>
           <span class="pd-rating-summary" id="pd-rating-summary"></span>
-        </div>
+        </button>
 
         <p class="pd-info__price" id="pd-price"></p>
         <p class="pd-info__description" id="pd-description"></p>
 
-        <div class="pd-details-block is-hidden">
-          <h3>Informações adicionais</h3>
-          <p id="pd-details"></p>
-        </div>
-
-        <button id="pd-add-btn" class="btn btn--primary btn--lg" data-action="add-to-cart">
+        <div class="pd-buy-box">
+          <p id="pd-stock" class="pd-stock"></p>
+          <label for="pd-quantity">Quantidade</label>
+          <div class="pd-quantity-control"><button id="pd-quantity-less" type="button" aria-label="Diminuir quantidade">−</button><input id="pd-quantity" type="number" inputmode="numeric" min="1" max="99" value="1"><button id="pd-quantity-more" type="button" aria-label="Aumentar quantidade">+</button><span id="pd-quantity-total" aria-live="polite"></span></div>
+          <button id="pd-buy-btn" class="btn btn--primary btn--lg" type="button">Comprar agora</button>
+          <button id="pd-add-btn" class="btn btn--outline btn--lg" type="button">
           <i class="fa-solid fa-cart-plus"></i> Adicionar ao carrinho
-        </button>
+          </button>
+          <p id="pd-cart-feedback" class="pd-cart-feedback" role="status"></p>
+          <p class="pd-checkout-note">Revise os dados e o frete antes de confirmar. Pagamento via PIX.</p>
+        </div>
+        <ul class="pd-trust"><li><i class="fa-solid fa-box" aria-hidden="true"></i> Embalagem discreta</li><li><i class="fa-solid fa-receipt" aria-hidden="true"></i> Acompanhe o pedido na sua conta</li></ul>
+        <button id="pd-share" class="pd-text-button" type="button"><i class="fa-solid fa-link" aria-hidden="true"></i> Copiar link do produto</button>
       </div>
     </div>
 
+    <nav class="pd-section-links" aria-label="Informações do produto"><a href="#pd-description-section">Descrição</a><a href="#pd-reviews-section">Avaliações</a><a href="#pd-related-section">Produtos relacionados</a></nav>
+    <section id="pd-description-section" class="pd-description-section"><h2>Sobre este produto</h2><p id="pd-full-description"></p><div class="pd-details-block is-hidden"><h3>Informações adicionais</h3><p id="pd-details"></p></div></section>
+
     <!-- Avaliações -->
-    <div class="pd-reviews">
+    <div class="pd-reviews" id="pd-reviews-section">
       <div class="section-heading">
         <h2><i class="fa-solid fa-star"></i> Avaliações</h2>
       </div>
@@ -482,12 +509,18 @@
     </div>
 
     <!-- Produtos relacionados -->
-    <div class="section-heading">
+    <div class="section-heading" id="pd-related-section">
       <h2>Você também pode gostar</h2>
     </div>
     <div id="pd-related-grid" class="product-grid"></div>
+    </div>
   </div>
 </section>
+
+<div id="modal-product-zoom" class="modal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="product-zoom-title">
+  <div class="modal__backdrop" data-close-modal></div>
+  <div class="modal__dialog product-zoom-dialog"><div class="product-zoom-heading"><h2 id="product-zoom-title">Fotos do produto</h2><button type="button" data-close-modal aria-label="Fechar fotos">×</button></div><div id="product-zoom-image"></div><div class="product-zoom-controls"><button type="button" id="product-zoom-prev" aria-label="Foto anterior">‹</button><span id="product-zoom-count" aria-live="polite"></span><button type="button" id="product-zoom-next" aria-label="Próxima foto">›</button></div></div>
+</div>
 
 <!-- ============================================================
      VIEW: ÁREA DO CLIENTE (histórico de pedidos)
@@ -850,6 +883,7 @@
         <div class="panel-card">
           <h2><i class="fa-solid fa-clipboard-list"></i> Todos os pedidos</h2>
           <form id="admin-orders-filters" class="order-filters">
+            <div class="form-field"><label for="orders-filter-number">Número do pedido</label><input id="orders-filter-number" name="number" type="search" maxlength="64" placeholder="Ex.: 000123 ou #000123"></div>
             <div class="form-field"><label for="orders-filter-from">Data inicial</label><input id="orders-filter-from" name="from" type="date"></div>
             <div class="form-field"><label for="orders-filter-to">Data final</label><input id="orders-filter-to" name="to" type="date"></div>
             <div class="form-field"><label for="orders-filter-client">Cliente</label><input id="orders-filter-client" name="client" type="search" placeholder="Nome do cliente"></div>

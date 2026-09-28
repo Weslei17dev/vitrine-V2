@@ -244,7 +244,7 @@
         limit: String(Number(options.limit) || 100),
         offset: String(Number(options.offset) || 0)
       });
-      ['from', 'to', 'client', 'status', 'product', 'minValue', 'maxValue'].forEach((key) => {
+      ['number', 'from', 'to', 'client', 'status', 'product', 'minValue', 'maxValue'].forEach((key) => {
         if (options[key] !== '' && options[key] != null) params.set(key, String(options[key]));
       });
       return apiFetch(`/api/orders?${params.toString()}`);
