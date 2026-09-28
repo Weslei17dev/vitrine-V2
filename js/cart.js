@@ -212,15 +212,18 @@
     const totalEl = document.getElementById('cart-total');
     const emptyState = document.getElementById('cart-empty-state');
     const footer = document.getElementById('cart-footer');
+    const extras = document.getElementById('cart-order-extras');
     if (!list) return;
 
     if (!items.length) {
       list.innerHTML = '';
       if (emptyState) emptyState.classList.remove('is-hidden');
       if (footer) footer.classList.add('is-hidden');
+      if (extras) extras.classList.add('is-hidden');
     } else {
       if (emptyState) emptyState.classList.add('is-hidden');
       if (footer) footer.classList.remove('is-hidden');
+      if (extras) extras.classList.remove('is-hidden');
       list.innerHTML = items.map(cartItemRowHtml).join('');
     }
 

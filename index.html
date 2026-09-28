@@ -23,7 +23,7 @@
 
   <link rel="stylesheet" href="css/style.css?v=20260928-4">
   <link rel="stylesheet" href="css/improvements.css?v=20260928-4">
-  <link rel="stylesheet" href="css/commerce.css?v=20260928-4">
+  <link rel="stylesheet" href="css/commerce.css?v=20260928-5">
 <script src="js/frameGuard.js?v=20260928-4"></script>
 </head>
 <body>
@@ -1249,15 +1249,17 @@
         <p>Seu carrinho está vazio.</p>
       </div>
       <div id="cart-items-list" class="cart-items-list"></div>
+      <div id="cart-order-extras" class="cart-order-extras is-hidden">
+        <form id="cart-coupon-form" class="checkout-coupon-form">
+          <label for="cart-coupon-code">Tem um cupom? Aplique aqui</label>
+          <div><input id="cart-coupon-code" type="text" maxlength="32" autocomplete="off" placeholder="Código do cupom"><button class="btn btn--outline btn--sm" type="submit">Aplicar</button><button id="cart-coupon-remove" class="btn btn--ghost btn--sm is-hidden" type="button">Remover</button></div>
+          <p id="cart-coupon-message" class="theme-hint" role="status"></p>
+        </form>
+        <div id="cart-costs" class="checkout-costs" aria-live="polite"></div>
+      </div>
     </div>
 
     <div id="cart-footer" class="modal__footer cart-footer is-hidden">
-      <form id="cart-coupon-form" class="checkout-coupon-form">
-        <label for="cart-coupon-code">Tem um cupom? Aplique aqui</label>
-        <div><input id="cart-coupon-code" type="text" maxlength="32" autocomplete="off" placeholder="Código do cupom"><button class="btn btn--outline btn--sm" type="submit">Aplicar</button><button id="cart-coupon-remove" class="btn btn--ghost btn--sm is-hidden" type="button">Remover</button></div>
-        <p id="cart-coupon-message" class="theme-hint" role="status"></p>
-      </form>
-      <div id="cart-costs" class="checkout-costs" aria-live="polite"></div>
       <div class="cart-total-row">
         <span>Total estimado</span>
         <strong id="cart-total">R$ 0,00</strong>
@@ -1486,7 +1488,7 @@
 <script src="js/products.js?v=20260928-4"></script>
 <script src="js/productMedia.js?v=20260928-4"></script>
 <script src="js/productDetail.js?v=20260928-4"></script>
-<script src="js/cart.js?v=20260928-4"></script>
+<script src="js/cart.js?v=20260928-5"></script>
 <script src="js/orders.js?v=20260928-4"></script>
 <script src="js/customerArea.js?v=20260928-4"></script>
 <script src="js/adminReports.js?v=20260928-4"></script>

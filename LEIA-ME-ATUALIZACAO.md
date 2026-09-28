@@ -14,6 +14,8 @@ A URL de API presente no arquivo enviado foi preservada em `js/apiConfig.js`. Ma
 
 ## Novidades desta entrega
 
+- O painel do carrinho ficou mais largo no computador. Itens, cupom e frete agora rolam juntos; o total e os botões permanecem visíveis em uma faixa compacta na parte inferior, sem cobrir os controles de quantidade.
+
 - O cupom aparece diretamente no carrinho, inclusive para visitantes. A cotação mostra subtotal, descontos, frete e total; o código aplicado acompanha a finalização após login. O checkout continua permitindo aplicar ou remover o cupom.
 - Na aba **Descontos e cupons**, o administrador pode criar um código do tipo **Frete grátis**, com elegibilidade para toda a loja, uma categoria ou um produto. O servidor valida a elegibilidade e registra o abatimento do frete no pedido.
 - O frete usa uma tarifa fixa ilustrativa e a regra de frete grátis configuradas em **Personalização → Frete**. Os valores são recalculados pelo servidor no carrinho, no checkout e ao criar o PIX. Prazo de entrega exibido é estimado; não existe integração com transportadora ou cálculo por CEP nesta versão. Antes de vender, configure os valores reais no painel.
