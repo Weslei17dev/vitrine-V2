@@ -79,6 +79,17 @@
     document.getElementById('product-zoom-count').textContent = `${gallerySelection + 1} / ${images.length}`;
     document.getElementById('product-zoom-prev').disabled = images.length < 2;
     document.getElementById('product-zoom-next').disabled = images.length < 2;
+    setZoom(false);
+  }
+
+  function setZoom(magnified) {
+    const viewport = document.getElementById('product-zoom-image');
+    const button = document.getElementById('product-zoom-toggle');
+    viewport.classList.toggle('is-magnified', magnified);
+    viewport.style.removeProperty('--zoom-x');
+    viewport.style.removeProperty('--zoom-y');
+    button.setAttribute('aria-pressed', String(magnified));
+    button.textContent = magnified ? 'Voltar ao tamanho normal' : 'Ampliar 2×';
   }
 
   function updateQuantity() {
@@ -353,6 +364,21 @@
     const changeZoom = (delta) => { if (selectPhoto) { selectPhoto(gallerySelection + delta); renderZoom(); } };
     document.getElementById('product-zoom-prev').addEventListener('click', () => changeZoom(-1));
     document.getElementById('product-zoom-next').addEventListener('click', () => changeZoom(1));
+    document.getElementById('product-zoom-toggle').addEventListener('click', () => {
+      const viewport = document.getElementById('product-zoom-image');
+      setZoom(!viewport.classList.contains('is-magnified'));
+    });
+    document.getElementById('product-zoom-image').addEventListener('click', () => {
+      const viewport = document.getElementById('product-zoom-image');
+      setZoom(!viewport.classList.contains('is-magnified'));
+    });
+    document.getElementById('product-zoom-image').addEventListener('pointermove', (event) => {
+      const viewport = event.currentTarget;
+      if (!viewport.classList.contains('is-magnified') || event.pointerType !== 'mouse') return;
+      const bounds = viewport.getBoundingClientRect();
+      viewport.style.setProperty('--zoom-x', `${(event.clientX - bounds.left) / bounds.width * 100}%`);
+      viewport.style.setProperty('--zoom-y', `${(event.clientY - bounds.top) / bounds.height * 100}%`);
+    });
     document.getElementById('modal-product-zoom').addEventListener('keydown', (event) => {
       if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); changeZoom(event.key === 'ArrowLeft' ? -1 : 1); }
     });

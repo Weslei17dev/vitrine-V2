@@ -14,6 +14,10 @@ A URL de API presente no arquivo enviado foi preservada em `js/apiConfig.js`. Ma
 
 ## Novidades desta entrega
 
+- Correção do menu de categorias: passa o mouse para abrir no computador; no celular, toque em “Categorias”. O menu também mantém o acesso por clique e exibe categorias com produtos mesmo quando a lista de categorias configuradas não estiver completa.
+- Controle “− / +” e campo de quantidade atualizam o subtotal antes da compra. “Adicionar ao carrinho” acrescenta as unidades selecionadas e “Comprar agora” soma as unidades ao carrinho antes do checkout. O limite respeita o estoque disponível e o máximo de 99 unidades por item.
+- Clique na imagem principal para abrir a galeria; na janela, clique na foto ou em “Ampliar 2×” para aproximar. No computador, mova o mouse para examinar os detalhes; as setas trocam de foto.
+- Versão dos arquivos CSS e JavaScript na página para que a publicação carregue o conjunto atualizado. O HTML solicita revalidação ao host que suporta `_headers`.
 - Página de produto com foto inteira, miniaturas, ampliação e navegação entre fotos; no celular também é possível deslizar a foto principal.
 - Preço, estoque, seletor de quantidade, subtotal, “Comprar agora” e “Adicionar ao carrinho” reunidos em um bloco de compra.
 - Descrição completa, informações adicionais, avaliações e relacionados em seções acessíveis por atalhos.

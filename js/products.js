@@ -32,9 +32,10 @@
     const container = document.getElementById('category-filters');
     if (!container) return;
 
-    const categoryNames = state.categories.length
-      ? state.categories.filter((category) => category.active !== false).map((category) => category.name)
-      : [...new Set(state.all.map((p) => p.category))];
+    const categoryNames = [...new Set([
+      ...state.categories.filter((category) => category.active !== false).map((category) => category.name),
+      ...state.all.filter((product) => product.active !== false).map((product) => product.category)
+    ])].filter(Boolean);
     const categories = ['Todos', ...categoryNames];
     container.innerHTML = categories
       .map(
@@ -369,7 +370,18 @@
   }
 
   function init() {
-    document.getElementById('category-menu-toggle').addEventListener('click', () => setCategoryMenu(document.getElementById('category-menu-panel').hidden));
+    const categoryMenu = document.querySelector('.category-menu');
+    const mouseHover = matchMedia('(hover: hover) and (pointer: fine)');
+    categoryMenu.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse' && mouseHover.matches) setCategoryMenu(true);
+    });
+    categoryMenu.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'mouse' && mouseHover.matches) setCategoryMenu(false);
+    });
+    document.getElementById('category-menu-toggle').addEventListener('click', () => {
+      const closed = document.getElementById('category-menu-panel').hidden;
+      setCategoryMenu(mouseHover.matches ? true : closed);
+    });
     document.getElementById('category-menu-close').addEventListener('click', () => setCategoryMenu(false, true));
     document.addEventListener('click', (event) => {
       const category = event.target.closest('[data-open-catalog]');
