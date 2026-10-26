@@ -14,6 +14,9 @@
   let couponCode = '';
   let quote = null;
   let quoteRequest = 0;
+  let shippingMode = 'loading';
+  let shippingZip = sessionStorage.getItem('vitrine:shipping-zip') || '';
+  let serviceId = null;
   const itemKey = (item) => JSON.stringify([item.productId, item.selectedColor || null]);
   const totalForProduct = (productId) => items.filter((item) => item.productId === productId).reduce((sum, item) => sum + item.qty, 0);
 
@@ -232,9 +235,14 @@
     if (costs) costs.innerHTML = quote ? `
       <div><span>Produtos</span><strong>${Utils.formatCurrency(quote.grossSubtotal)}</strong></div>
       ${quote.discountTotal ? `<div class="checkout-discount"><span>Descontos nos produtos</span><strong>− ${Utils.formatCurrency(quote.discountTotal)}</strong></div>` : ''}
-      <div><span>Frete de exemplo · ${quote.estimatedDays} dias úteis</span><strong>${quote.shippingTotal ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
-      ${quote.shippingDiscount ? `<div class="checkout-discount"><span>Cupom de frete grátis</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
-      <small class="theme-hint">Tarifa ilustrativa, editável pelo administrador.</small>` : items.length ? '<small class="theme-hint">Calculando frete e descontos…</small>' : '';
+      <div><span>${shippingMode === 'melhor_envio' ? `${Utils.escapeHtml(quote.shippingCompany || '')} · ${Utils.escapeHtml(quote.shippingService || '')} · ${quote.estimatedShippingDays} dias úteis` : `Frete de exemplo · ${quote.estimatedDays} dias úteis`}</span><strong>${quote.shippingTotal ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
+      ${quote.shippingDiscount ? `<div class="checkout-discount"><span>Frete subsidiado pela loja</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
+      ${shippingMode === 'example' ? '<small class="theme-hint">Tarifa ilustrativa, editável pelo administrador.</small>' : ''}` : items.length ? `<small class="theme-hint">${shippingMode === 'melhor_envio' && !/^\d{8}$/.test(shippingZip.replace(/\D/g,'')) ? 'Informe seu CEP para ver o frete real.' : 'Calculando frete e descontos…'}</small>` : '';
+    const options = document.getElementById('cart-shipping-options');
+    if (options) options.innerHTML = shippingMode === 'melhor_envio' && quote?.shippingOptions?.length ? `<strong>Escolha a entrega</strong>${quote.shippingOptions.map(o => `<label class="shipping-option"><input type="radio" name="cart-service" value="${Utils.escapeHtml(String(o.id))}" ${String(o.id) === String(quote.shippingServiceId) ? 'checked' : ''}><span>${Utils.escapeHtml(o.company)} · ${Utils.escapeHtml(o.service)} · ${o.days} dias úteis</span><strong>${Utils.formatCurrency(o.price)}</strong></label>`).join('')}` : '';
+    document.getElementById('cart-zip-form')?.classList.toggle('is-hidden', shippingMode !== 'melhor_envio');
+    const checkoutBtn = document.getElementById('go-checkout-btn');
+    if (checkoutBtn) checkoutBtn.disabled = shippingMode === 'loading' || (shippingMode === 'melhor_envio' && !quote?.shippingQuoteId);
     document.getElementById('cart-coupon-remove')?.classList.toggle('is-hidden', !couponCode);
   }
 
@@ -247,10 +255,11 @@
 
   function refreshQuote(attempt = couponCode) {
     const request = ++quoteRequest;
-    if (!items.length) return Promise.resolve();
-    return DataService.Orders.quote(items, attempt).then((result) => {
+    if (!items.length || shippingMode === 'loading' || (shippingMode === 'melhor_envio' && !/^\d{8}$/.test(shippingZip.replace(/\D/g,'')))) { renderDrawer(); return Promise.resolve(); }
+    return DataService.Orders.quote(items, attempt, shippingZip, serviceId).then((result) => {
       if (request !== quoteRequest) return;
       quote = result;
+      serviceId = result.shippingServiceId || null;
       couponCode = result.couponCode || '';
       document.getElementById('cart-coupon-code').value = couponCode;
       document.getElementById('cart-coupon-message').textContent = couponCode ? `Cupom ${couponCode} aplicado.` : '';
@@ -258,6 +267,7 @@
     }).catch((err) => {
       if (request !== quoteRequest) return;
       document.getElementById('cart-coupon-message').textContent = err.message;
+      if (err.code === 'invalid_service') serviceId = null;
       quote = null;
       renderDrawer();
     });
@@ -272,6 +282,7 @@
     if (items.some((item) => maxQuantity(item) < 1)) {
       Utils.showToast('Remova os produtos indisponíveis antes de finalizar.', 'warning'); return;
     }
+    if (shippingMode === 'melhor_envio' && !quote?.shippingQuoteId) { Utils.showToast('Calcule e escolha um frete antes de continuar.', 'warning'); return; }
     Utils.closeModal('modal-cart');
     if (!global.App.state.currentUser) {
       sessionStorage.setItem('vitrine:resume-checkout', '1');
@@ -279,7 +290,7 @@
       global.App.navigate('login');
       return;
     }
-    global.OrdersModule.openCheckout(items.map((item) => ({ ...item })), couponCode);
+    global.OrdersModule.openCheckout(items.map((item) => ({ ...item })), couponCode, shippingZip, serviceId);
   }
 
   function resumeCheckout() {
@@ -336,10 +347,14 @@
       refreshQuote(document.getElementById('cart-coupon-code').value.trim());
     });
     document.getElementById('cart-coupon-remove')?.addEventListener('click', () => refreshQuote(''));
+    document.getElementById('cart-zip-form')?.addEventListener('submit', event => {event.preventDefault(); shippingZip=document.getElementById('cart-zip').value.trim(); sessionStorage.setItem('vitrine:shipping-zip',shippingZip); serviceId=null; quote=null; refreshQuote();});
+    document.getElementById('cart-shipping-options')?.addEventListener('change', event => {if(event.target.name==='cart-service'){serviceId=event.target.value;quote=null;refreshQuote();}});
   }
 
   function init() {
     wireDrawerEvents();
+    document.getElementById('cart-zip').value = shippingZip;
+    DataService.Orders.mode().then(result => {shippingMode=result.mode;renderAll();}).catch(() => {shippingMode='melhor_envio';renderDrawer();});
     loadForCurrentUser();
   }
 

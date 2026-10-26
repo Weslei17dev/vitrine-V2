@@ -233,6 +233,7 @@
     document.getElementById('product-form-title').textContent = product ? 'Editar Produto' : 'Novo Produto';
 
     if (product) {
+      ['shippingWeightKg','shippingHeightCm','shippingWidthCm','shippingLengthCm'].forEach(key=>{form.elements[key].value=product[key]??'';});
       form.elements.name.value = product.name;
       form.elements.description.value = product.description;
       form.elements.salePrice.value = product.compareAtPrice || product.price;
@@ -361,6 +362,10 @@
       image: currentProductImage || null,
       gallery: currentProductGallery.filter(Boolean),
       details: form.elements.details.value.trim(),
+      shippingWeightKg:form.elements.shippingWeightKg.value === '' ? null : Number(form.elements.shippingWeightKg.value),
+      shippingHeightCm:form.elements.shippingHeightCm.value === '' ? null : Number(form.elements.shippingHeightCm.value),
+      shippingWidthCm:form.elements.shippingWidthCm.value === '' ? null : Number(form.elements.shippingWidthCm.value),
+      shippingLengthCm:form.elements.shippingLengthCm.value === '' ? null : Number(form.elements.shippingLengthCm.value),
       updatedAt: editingProductUpdatedAt
     };
 
@@ -871,7 +876,7 @@
       btn.classList.toggle('is-active', btn.dataset.adminTab === tabName);
     });
     const titles = {
-      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', categorias: 'Categorias', descontos: 'Descontos e cupons',
+      dashboard: 'Painel Administrativo', clientes: 'Clientes', pedidos: 'Pedidos', produtos: 'Produtos', frete:'Frete e etiquetas', categorias: 'Categorias', descontos: 'Descontos e cupons',
       relatorios: 'Relatórios', custos: 'Custos e lucratividade', avaliacoes: 'Avaliações', auditoria: 'Auditoria', personalizar: 'Personalizar loja'
     };
     const title = document.getElementById('admin-topbar-title');
@@ -881,6 +886,7 @@
     if (tabName === 'relatorios' && global.AdminReportsModule) global.AdminReportsModule.onAdminTabActivated();
     if (tabName === 'custos' && global.AdminCostsModule) global.AdminCostsModule.load();
     if (tabName === 'descontos' && global.AdminPromotionsModule) global.AdminPromotionsModule.load();
+    if (tabName === 'frete') global.AdminShippingModule?.load();
   }
 
   // ==========================================================================

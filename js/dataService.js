@@ -200,6 +200,14 @@
       return apiFetch(`/api/products/${id}`, { method: 'DELETE' });
     }
   };
+  const MelhorEnvioRepository = {
+    status:()=>apiFetch('/api/melhor-envio/status'),
+    start:()=>apiFetch('/api/melhor-envio/oauth/start',{method:'POST',body:'{}'}),
+    sender:body=>apiFetch('/api/melhor-envio/sender',{method:'PUT',body:JSON.stringify(body)}),
+    shipment:id=>apiFetch(`/api/melhor-envio/orders/${id}`),
+    tracking:id=>apiFetch(`/api/melhor-envio/tracking/${id}`),
+    action:(id,action,body={})=>apiFetch(`/api/melhor-envio/orders/${id}/${action}`,{method:'POST',body:JSON.stringify(body)})
+  };
 
   // ============================================================================
   // REPOSITÓRIO: Carrinho (continua 100% local — ver nota no topo do arquivo)
@@ -226,17 +234,18 @@
     STATUS_FLOW,
     STATUS_CANCELLED,
 
-    create({ items, idempotencyKey, couponCode, expectedTotal }) {
+    create({ items, idempotencyKey, couponCode, expectedTotal, shippingQuoteId, shippingServiceId }) {
       return apiFetch('/api/orders', {
         method: 'POST',
         headers: { 'Idempotency-Key': idempotencyKey },
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode, expectedTotal })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode, expectedTotal, shippingQuoteId, shippingServiceId })
       });
     },
-    quote(items, couponCode = '') {
+    mode() { return apiFetch('/api/orders/shipping-mode'); },
+    quote(items, couponCode = '', zip = '', shippingServiceId = null) {
       return apiFetch('/api/orders/quote', {
         method: 'POST',
-        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode })
+        body: JSON.stringify({ items: items.map((item) => ({ productId: item.productId, qty: item.qty, selectedColor: item.selectedColor || null })), couponCode, zip, shippingServiceId })
       });
     },
     getAll(options = {}) {
@@ -441,6 +450,7 @@
   global.DataService = {
     Auth: AuthRepository,
     Products: ProductRepository,
+    MelhorEnvio: MelhorEnvioRepository,
     Categories: CategoryRepository,
     Cart: CartRepository,
     Orders: OrderRepository,
