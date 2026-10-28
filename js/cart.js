@@ -13,6 +13,7 @@
   let items = []; // [{ productId, name, price, icon, stock, qty }]
   let couponCode = '';
   let quote = null;
+  let quoteError = '';
   let quoteRequest = 0;
   let shippingMode = 'loading';
   let shippingZip = sessionStorage.getItem('vitrine:shipping-zip') || '';
@@ -237,7 +238,7 @@
       ${quote.discountTotal ? `<div class="checkout-discount"><span>Descontos nos produtos</span><strong>− ${Utils.formatCurrency(quote.discountTotal)}</strong></div>` : ''}
       <div><span>${shippingMode === 'melhor_envio' ? `${Utils.escapeHtml(quote.shippingCompany || '')} · ${Utils.escapeHtml(quote.shippingService || '')} · ${quote.estimatedShippingDays} dias úteis` : `Frete de exemplo · ${quote.estimatedDays} dias úteis`}</span><strong>${quote.shippingTotal ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
       ${quote.shippingDiscount ? `<div class="checkout-discount"><span>Frete subsidiado pela loja</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
-      ${shippingMode === 'example' ? '<small class="theme-hint">Tarifa ilustrativa, editável pelo administrador.</small>' : ''}` : items.length ? `<small class="theme-hint">${shippingMode === 'melhor_envio' && !/^\d{8}$/.test(shippingZip.replace(/\D/g,'')) ? 'Informe seu CEP para ver o frete real.' : 'Calculando frete e descontos…'}</small>` : '';
+      ${shippingMode === 'example' ? '<small class="theme-hint">Tarifa ilustrativa, editável pelo administrador.</small>' : ''}` : items.length ? `<small class="theme-hint">${quoteError ? Utils.escapeHtml(quoteError) : shippingMode === 'melhor_envio' && !/^\d{8}$/.test(shippingZip.replace(/\D/g,'')) ? 'Informe seu CEP para ver o frete real.' : 'Calculando frete e descontos…'}</small>` : '';
     const options = document.getElementById('cart-shipping-options');
     if (options) options.innerHTML = shippingMode === 'melhor_envio' && quote?.shippingOptions?.length ? `<strong>Escolha a entrega</strong>${quote.shippingOptions.map(o => `<label class="shipping-option"><input type="radio" name="cart-service" value="${Utils.escapeHtml(String(o.id))}" ${String(o.id) === String(quote.shippingServiceId) ? 'checked' : ''}><span>${Utils.escapeHtml(o.company)} · ${Utils.escapeHtml(o.service)} · ${o.days} dias úteis</span><strong>${Utils.formatCurrency(o.price)}</strong></label>`).join('')}` : '';
     document.getElementById('cart-zip-form')?.classList.toggle('is-hidden', shippingMode !== 'melhor_envio');
@@ -255,6 +256,7 @@
 
   function refreshQuote(attempt = couponCode) {
     const request = ++quoteRequest;
+    quoteError = '';
     if (!items.length || shippingMode === 'loading' || (shippingMode === 'melhor_envio' && !/^\d{8}$/.test(shippingZip.replace(/\D/g,'')))) { renderDrawer(); return Promise.resolve(); }
     return DataService.Orders.quote(items, attempt, shippingZip, serviceId).then((result) => {
       if (request !== quoteRequest) return;
@@ -266,7 +268,8 @@
       renderDrawer();
     }).catch((err) => {
       if (request !== quoteRequest) return;
-      document.getElementById('cart-coupon-message').textContent = err.message;
+      quoteError = err.message || 'Não foi possível calcular o frete. Tente novamente.';
+      document.getElementById('cart-coupon-message').textContent = '';
       if (err.code === 'invalid_service') serviceId = null;
       quote = null;
       renderDrawer();

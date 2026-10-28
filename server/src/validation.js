@@ -45,7 +45,7 @@ function phone(value) {
 
 function zip(value) {
   const normalized = digits(value);
-  if (normalized.length !== 8) throw new ValidationError('Informe um CEP válido.');
+  if (normalized.length !== 8 || normalized === '00000000') throw new ValidationError('Informe um CEP válido.');
   return normalized;
 }
 
