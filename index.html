@@ -935,7 +935,14 @@
       <div class="admin-tab-panel" data-tab-panel="frete"><div class="panel-card"><div class="panel-card__header"><h2>Melhor Envio</h2><button id="me-connect" type="button" class="btn btn--primary btn--sm">Conectar conta</button></div><p id="me-status" role="status"></p><h3>Remetente e origem</h3><form id="me-sender" class="form-grid">
         <div class="form-field"><label>Nome<input name="name" required></label></div><div class="form-field"><label>E-mail<input name="email" type="email" required></label></div><div class="form-field"><label>Telefone<input name="phone" required></label></div><div class="form-field"><label>CPF (pessoa física)<input name="document"></label></div><div class="form-field"><label>CNPJ (pessoa jurídica)<input name="company_document"></label></div><div class="form-field"><label>Inscrição estadual (se aplicável)<input name="state_register"></label></div><div class="form-field"><label>CNAE (7 dígitos, necessário para LATAM PJ)<input name="economic_activity_code"></label></div>
         <div class="form-field"><label>Rua<input name="address" required></label></div><div class="form-field"><label>Número<input name="number" required></label></div><div class="form-field"><label>Complemento<input name="complement"></label></div><div class="form-field"><label>Bairro<input name="district" required></label></div><div class="form-field"><label>Cidade<input name="city" required></label></div><div class="form-field"><label>UF<input name="state_abbr" maxlength="2" required></label></div><div class="form-field"><label>CEP de origem<input name="postal_code" required></label></div>
-        <div class="form-field form-field--span2"><button class="btn btn--primary" type="submit">Salvar remetente</button></div></form><h3>Produtos sem medidas para cotação</h3><div id="me-missing-products" class="theme-hint"></div></div></div>
+        <div class="form-field form-field--span2"><button class="btn btn--primary" type="submit">Salvar remetente</button></div></form><h3>Produtos sem medidas para cotação</h3><div id="me-missing-products" class="theme-hint"></div>
+        <h3>Testar cotação real</h3><p class="theme-hint">Consulta protegida para administradores. Não cria pedido nem compra etiqueta.</p>
+        <form id="me-test-quote" class="form-grid">
+          <div class="form-field"><label>Produto<select name="productId" required><option value="">Selecione um produto</option></select></label></div>
+          <div class="form-field"><label>Quantidade<input name="qty" type="number" min="1" max="99" value="1" required></label></div>
+          <div class="form-field"><label>CEP de destino<input name="zip" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="Somente 8 números" required></label></div>
+          <div class="form-field"><button class="btn btn--outline" type="submit">Consultar fretes</button></div>
+        </form><div id="me-test-result" role="status" aria-live="polite"></div></div></div>
 
       <!-- ---------- CATEGORIAS ---------- -->
       <div class="admin-tab-panel" data-tab-panel="categorias">
