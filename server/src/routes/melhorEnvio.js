@@ -108,6 +108,17 @@ router.get('/status',async(_req,res,next)=>{try {
   ]);
   res.json({environment:me.environment,connected:me.enabled()&&token.rows[0]?.environment===me.environment,expiresAt:token.rows[0]?.expires_at||null,sender:sender.rows[0]?.sender||{},missingProducts:missing.rows});
 }catch(err){next(err)}});
+router.post('/diagnostic-quote',orderLimiter,async(req,res,next)=>{try {
+  const zip=V.zip(req.body?.zip);
+  const raw=req.body?.items;
+  if(!Array.isArray(raw)||raw.length<1||raw.length>20)throw new V.ValidationError('Selecione entre 1 e 20 produtos para testar a cotação.');
+  const items=raw.map(item=>({productId:V.uuid(item?.productId,'Produto'),qty:V.positiveInteger(item?.qty,'Quantidade',99)}));
+  const ids=[...new Set(items.map(item=>item.productId))];
+  const rows=(await pool.query('SELECT id,name,price,active,shipping_weight_kg,shipping_height_cm,shipping_width_cm,shipping_length_cm FROM products WHERE id=ANY($1::uuid[])',[ids])).rows;
+  if(rows.length!==ids.length||rows.some(row=>!row.active))throw new V.ValidationError('Selecione produtos ativos da loja.');
+  const options=await me.calculate(items,rows,zip,await readSender());
+  res.json({environment:me.environment,options:options.map(({packages,...option})=>({...option,volumes:packages.length}))});
+}catch(err){next(err)}});
 router.post('/oauth/start',orderLimiter,async(req,res,next)=>{try {res.json({url:await me.start(req.user.id)});}catch(err){next(err)}});
 router.put('/sender',async(req,res,next)=>{try {
   const sender=senderPayload(req.body||{});
