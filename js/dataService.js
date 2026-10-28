@@ -204,6 +204,7 @@
     status:()=>apiFetch('/api/melhor-envio/status'),
     start:()=>apiFetch('/api/melhor-envio/oauth/start',{method:'POST',body:'{}'}),
     sender:body=>apiFetch('/api/melhor-envio/sender',{method:'PUT',body:JSON.stringify(body)}),
+    diagnosticQuote:body=>apiFetch('/api/melhor-envio/diagnostic-quote',{method:'POST',body:JSON.stringify(body)}),
     shipment:id=>apiFetch(`/api/melhor-envio/orders/${id}`),
     tracking:id=>apiFetch(`/api/melhor-envio/tracking/${id}`),
     action:(id,action,body={})=>apiFetch(`/api/melhor-envio/orders/${id}/${action}`,{method:'POST',body:JSON.stringify(body)})
