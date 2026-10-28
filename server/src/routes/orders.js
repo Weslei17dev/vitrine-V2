@@ -11,8 +11,10 @@ const { normalizeCode, priceOrder } = require('../utils/promotions');
 const config = require('../config');
 const { cancelLockedOrder, expirePendingOrders, releaseCoupon } = require('../utils/orderLifecycle');
 const { recordAudit } = require('../utils/audit');
+const me = require('../utils/melhorEnvio');
 
 const router = express.Router();
+router.get('/shipping-mode', (_req,res)=>res.json({mode:me.enabled()?'melhor_envio':'example'}));
 
 const STATUS_FLOW = ['Aguardando Pagamento', 'Aguardando Confirmação', 'Pago', 'Em Produção', 'Enviado', 'Finalizado'];
 const STATUS_CANCELLED = 'Cancelado';
@@ -48,6 +50,15 @@ function toPublicOrder(row) {
     shippingDiscount: Number(row.shipping_discount || 0),
     couponCode: row.coupon_code || null,
     shippingTotal: Number(row.shipping_total || 0),
+    shippingProvider: row.shipping_provider || null,
+    shippingQuoteId: row.shipping_quote_id || null,
+    shippingServiceId: row.shipping_service_id || null,
+    shippingCompany: row.shipping_company || null,
+    shippingService: row.shipping_service || null,
+    shippingCost: row.shipping_cost == null ? null : Number(row.shipping_cost),
+    shippingEstimatedDays: row.shipping_estimated_days || null,
+    trackingCode: row.shipping_tracking_code || null,
+    transportStatus: row.shipping_transport_status || null,
     total: Number(row.total),
     status: row.status,
     statusHistory: Array.isArray(row.status_history) ? row.status_history : [],
@@ -101,6 +112,14 @@ async function readStoreContent(database = pool) {
   return deepMerge(SITE_CONTENT_DEFAULTS, result.rows[0] ? result.rows[0].content : {});
 }
 
+async function readSender(database=pool) {
+  const row=(await database.query('SELECT sender FROM me_settings WHERE id=1')).rows[0];
+  if(!row?.sender?.postal_code)throw me.bad('O frete está indisponível: configure o CEP de origem no painel.',503,'shipping_unavailable');
+  return row.sender;
+}
+const freeThreshold = (content) => Math.round(Number(content.shipping?.freeAbove||0)*100);
+const moneyCents = (value) => Math.round(Number(value)*100);
+
 function shippingForSubtotal(content, subtotalCents) {
   const shipping = content.shipping || {};
   const flatCents = Math.max(0, Math.round(Number(shipping.flatRate || 0) * 100));
@@ -115,13 +134,28 @@ router.post('/quote', orderLimiter, async (req, res, next) => {
     const couponCode = normalizeCode(req.body && req.body.couponCode);
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await pool.query(
-      'SELECT id, name, price, category, stock, active, colors FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
+      'SELECT id, name, price, category, stock, active, colors,shipping_weight_kg,shipping_height_cm,shipping_width_cm,shipping_length_cm FROM products WHERE id=ANY($1::uuid[]) ORDER BY id',
       [productIds]
     );
     if (productsResult.rows.length !== new Set(productIds).size) throw new V.ValidationError('Um dos produtos não está mais disponível.');
     const content = await readStoreContent();
+    let shippingOptions=[], chosen=null, quoteId=null, zip=null;
+    if(me.enabled()) {
+      zip=V.zip(req.body?.zip);
+      // A regra comercial é calculada primeiro, mas o custo do frete sempre vem da API externa.
+      await priceOrder(pool,requestedItems,productsResult.rows,couponCode,()=>0);
+      shippingOptions=await me.calculate(requestedItems,productsResult.rows,zip,await readSender());
+      chosen=req.body?.shippingServiceId == null ? shippingOptions[0] : shippingOptions.find(option=>option.id===Number(req.body.shippingServiceId));
+      if(!chosen)throw me.bad('O serviço selecionado ficou indisponível. Recalcule o frete.',409,'invalid_service');
+      const saved=await pool.query(`INSERT INTO me_shipping_quotes(environment,user_id,zip,cart_hash,coupon_code,options,expires_at)
+        VALUES($1,$2,$3,$4,$5,$6::jsonb,now()+interval '5 minutes') RETURNING id`,[
+        me.environment,req.user?.id||null,zip,me.cartHash(requestedItems,couponCode),couponCode,JSON.stringify(shippingOptions)
+      ]);
+      quoteId=saved.rows[0].id;
+    }
     const calculated = await priceOrder(pool, requestedItems, productsResult.rows, couponCode,
-      (subtotal) => shippingForSubtotal(content, subtotal));
+      (subtotal) => chosen ? moneyCents(chosen.price) : shippingForSubtotal(content, subtotal),
+      {freeAboveCents:chosen?freeThreshold(content):0});
     res.json({
       items: calculated.items.map(({ unitCost, ...item }) => item),
       subtotal: calculated.subtotalCents / 100,
@@ -134,7 +168,12 @@ router.post('/quote', orderLimiter, async (req, res, next) => {
       couponCode: calculated.coupon?.code || null,
       shippingTotal: calculated.shippingCents / 100,
       total: calculated.totalCents / 100,
-      estimatedDays: Number(content.shipping && content.shipping.estimatedDays) || 7
+      estimatedDays: chosen ? chosen.days : Number(content.shipping && content.shipping.estimatedDays) || 7
+      ,shippingMode:me.enabled()?'melhor_envio':'example',zip,
+      shippingQuoteId:quoteId,shippingServiceId:chosen?.id||null,
+      shippingCompany:chosen?.company||null,shippingService:chosen?.service||null,
+      shippingCost:chosen?.cost||null,shippingOptions,
+      estimatedShippingDays:chosen?.days||null
     });
   } catch (err) {
     next(err);
@@ -189,19 +228,36 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
 
     const productIds = requestedItems.map((item) => item.productId);
     const productsResult = await client.query(
-      'SELECT id, name, price, category, cost_price, stock, active, colors FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
+      'SELECT id, name, price, category, cost_price, stock, active, colors,shipping_weight_kg,shipping_height_cm,shipping_width_cm,shipping_length_cm FROM products WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',
       [productIds]
     );
     if (productsResult.rows.length !== new Set(productIds).size) throw new V.ValidationError('Um dos produtos não está mais disponível.');
 
     const content = await readStoreContent(client);
+    let chosen=null,quoteRow=null;
+    if(me.enabled()) {
+      const requestedQuote=V.uuid(req.body?.shippingQuoteId,'Cotação');
+      quoteRow=(await client.query('SELECT * FROM me_shipping_quotes WHERE id=$1 AND expires_at>now() AND environment=$2 FOR UPDATE',[requestedQuote,me.environment])).rows[0];
+      if(!quoteRow||quoteRow.cart_hash!==me.cartHash(requestedItems,couponCode)||quoteRow.zip!==V.zip(user.zip)||(quoteRow.user_id&&quoteRow.user_id!==req.user.id)) {
+        throw me.bad('O carrinho, o CEP ou a cotação mudou. Calcule o frete novamente.',409,'quote_changed');
+      }
+      chosen=quoteRow.options.find(option=>option.id===Number(req.body?.shippingServiceId));
+      if(!chosen)throw me.bad('Selecione uma opção de frete válida.',409,'quote_changed');
+      const fresh=await me.calculate(requestedItems,productsResult.rows,user.zip,await readSender(client));
+      const updated=fresh.find(option=>option.id===chosen.id);
+      if(!updated||moneyCents(updated.price)!==moneyCents(chosen.price)||moneyCents(updated.cost)!==moneyCents(chosen.cost)||JSON.stringify(updated.packages)!==JSON.stringify(chosen.packages)) {
+        throw me.bad('O valor do frete mudou. Recalcule e confirme o novo total.',409,'quote_changed');
+      }
+      chosen=updated;
+    }
     const calculated = await priceOrder(client, requestedItems, productsResult.rows, couponCode,
-      (subtotal) => shippingForSubtotal(content, subtotal), { lockCoupon: true });
+      (subtotal) => chosen ? moneyCents(chosen.price) : shippingForSubtotal(content, subtotal),
+      { lockCoupon: true,freeAboveCents:chosen?freeThreshold(content):0 });
     const canonicalItems = calculated.items;
     const subtotalCents = calculated.subtotalCents;
     const shippingCents = calculated.shippingCents;
     const total = calculated.totalCents / 100;
-    if (req.body?.expectedTotal != null && Math.round(V.nonNegativeMoney(req.body.expectedTotal, 'Valor confirmado') * 100) !== calculated.totalCents) {
+    if ((me.enabled() && req.body?.expectedTotal == null) || (req.body?.expectedTotal != null && Math.round(V.nonNegativeMoney(req.body.expectedTotal, 'Valor confirmado') * 100) !== calculated.totalCents)) {
       const error = new Error('O valor do pedido mudou. Confira o novo total antes de confirmar.');
       error.status = 409;
       error.code = 'quote_changed';
@@ -229,15 +285,17 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
       `INSERT INTO orders (
          number, user_id, customer_name, shipping_phone, shipping_address, shipping_city, shipping_state, shipping_zip,
          items, subtotal, shipping_total, total, status, status_history, pix_payload, idempotency_key, order_date, order_time, expires_at,
-         discount_total, automatic_discount, coupon_discount, coupon_code, shipping_discount
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+         discount_total, automatic_discount, coupon_discount, coupon_code, shipping_discount,
+         shipping_provider,shipping_quote_id,shipping_service_id,shipping_company,shipping_service,shipping_cost,shipping_estimated_days
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Aguardando Pagamento',$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30)
        RETURNING *`,
       [
         number, user.id, user.name, user.phone, user.address, user.city, user.state, user.zip,
         JSON.stringify(canonicalItems), subtotalCents / 100, shippingCents / 100, total, JSON.stringify(history), payload,
         idempotencyKey, dateStr, timeStr, expiresAt,
         (calculated.automaticCents + calculated.couponCents) / 100, calculated.automaticCents / 100,
-        calculated.couponCents / 100, calculated.coupon?.code || null, calculated.shippingDiscountCents / 100
+        calculated.couponCents / 100, calculated.coupon?.code || null, calculated.shippingDiscountCents / 100,
+        chosen?'melhor_envio':null,quoteRow?.id||null,chosen?.id||null,chosen?.company||null,chosen?.service||null,chosen?.cost||null,chosen?.days||null
       ]
     );
 

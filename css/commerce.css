@@ -201,3 +201,12 @@ button:disabled { cursor:not-allowed; opacity:.5; }
   .chat-helper { bottom:16px; }
 }
 @media(prefers-reduced-motion:reduce) { .product-card, .featured-card { transition:none; } }
+
+/* Opções de frete retornadas pelo Melhor Envio */
+.shipping-options { margin: 1rem 0; display: grid; gap: .65rem; }
+.shipping-option { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; border: 1px solid var(--border, #7775); border-radius: .65rem; padding: .7rem; cursor: pointer; }
+.shipping-option:has(input:checked) { border-color: var(--primary, #b91e1f); background: #b91e1f0c; }
+.shipping-option span { flex: 1; min-width: 10rem; }
+.shipping-option input { accent-color: var(--primary, #b91e1f); }
+#me-shipment-panel { display: grid; gap: .75rem; margin-top: 1rem; }
+#me-shipment-panel .form-grid { margin: .75rem 0; }

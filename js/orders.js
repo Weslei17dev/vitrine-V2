@@ -10,7 +10,7 @@
 (function (global) {
   'use strict';
 
-  let pendingCheckout = { items: [], total: 0, idempotencyKey: null, couponCode: '', requestId: 0 };
+  let pendingCheckout = { items: [], total: 0, idempotencyKey: null, couponCode: '', requestId: 0, zip:'', serviceId:null };
   let currentOrder = null;
 
   // --------------------------------------------------------------------------
@@ -42,7 +42,7 @@
           <div class="form-field form-field--span2"><label for="checkout-address">Endereço completo</label><input id="checkout-address" name="address" autocomplete="street-address" required minlength="5" value="${Utils.escapeHtml(user.address || '')}" placeholder="Rua, número, complemento e bairro"></div>
           <div class="form-field"><label for="checkout-city">Cidade</label><input id="checkout-city" name="city" autocomplete="address-level2" required minlength="2" value="${Utils.escapeHtml(user.city || '')}"></div>
           <div class="form-field"><label for="checkout-state">UF</label><input id="checkout-state" name="state" autocomplete="address-level1" required maxlength="2" minlength="2" value="${Utils.escapeHtml(user.state || '')}"></div>
-          <div class="form-field"><label for="checkout-zip">CEP</label><input id="checkout-zip" name="zip" autocomplete="postal-code" required inputmode="numeric" value="${Utils.escapeHtml(user.zip || '')}"></div>
+          <div class="form-field"><label for="checkout-zip">CEP</label><input id="checkout-zip" name="zip" autocomplete="postal-code" required inputmode="numeric" value="${Utils.escapeHtml(pendingCheckout.zip || user.zip || '')}"></div>
           <div class="form-field"><label for="checkout-phone">Telefone</label><input id="checkout-phone" name="phone" autocomplete="tel" required value="${Utils.escapeHtml(user.phone || '')}"></div>
         </div>
       </form>
@@ -63,9 +63,10 @@
         ${quote.automaticDiscount > 0 ? `<div class="checkout-discount"><span>Desconto nos produtos</span><strong>− ${Utils.formatCurrency(quote.automaticDiscount)}</strong></div>` : ''}
         ${quote.couponDiscount > 0 ? `<div class="checkout-discount"><span>Cupom ${Utils.escapeHtml(quote.couponCode)}</span><strong>− ${Utils.formatCurrency(quote.couponDiscount)}</strong></div>` : ''}
         <div><span>Subtotal</span><strong>${Utils.formatCurrency(quote.subtotal)}</strong></div>
-        <div><span>Frete de exemplo${quote.estimatedDays ? ` · estimativa de ${quote.estimatedDays} dias úteis` : ''}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
-        ${quote.shippingDiscount > 0 ? `<div class="checkout-discount"><span>Cupom de frete grátis</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
+        <div><span>${quote.shippingMode === 'melhor_envio' ? `${Utils.escapeHtml(quote.shippingCompany || '')} · ${Utils.escapeHtml(quote.shippingService || '')} · ${quote.estimatedShippingDays} dias úteis` : `Frete de exemplo · ${quote.estimatedDays} dias úteis`}</span><strong>${quote.shippingTotal > 0 ? Utils.formatCurrency(quote.shippingTotal) : 'Grátis'}</strong></div>
+        ${quote.shippingDiscount > 0 ? `<div class="checkout-discount"><span>Frete subsidiado pela loja</span><strong>− ${Utils.formatCurrency(quote.shippingDiscount)}</strong></div>` : ''}
       </div>
+      ${quote.shippingMode === 'melhor_envio' ? `<div class="shipping-options"><strong>Opções de entrega</strong>${quote.shippingOptions.map(o=>`<label class="shipping-option"><input name="checkout-service" type="radio" value="${Utils.escapeHtml(String(o.id))}" ${String(o.id)===String(quote.shippingServiceId)?'checked':''}><span>${Utils.escapeHtml(o.company)} · ${Utils.escapeHtml(o.service)} · ${o.days} dias úteis</span><strong>${Utils.formatCurrency(o.price)}</strong></label>`).join('')}</div>` : ''}
       <div class="checkout-total-row"><span>Total do pedido</span><strong>${Utils.formatCurrency(quote.total)}</strong></div>
 
       <p class="checkout-confirm-hint">
@@ -78,6 +79,8 @@
       requestQuote(document.getElementById('checkout-coupon-code').value.trim());
     });
     document.getElementById('checkout-remove-coupon')?.addEventListener('click', () => requestQuote(''));
+    document.getElementById('checkout-zip')?.addEventListener('change', () => {pendingCheckout.serviceId=null;requestQuote(pendingCheckout.couponCode);});
+    container.querySelectorAll('[name="checkout-service"]').forEach(input=>input.addEventListener('change',()=>{pendingCheckout.serviceId=input.value;requestQuote(pendingCheckout.couponCode);}));
   }
 
   function requestQuote(couponCode) {
@@ -87,11 +90,15 @@
     const address = addressForm ? Object.fromEntries(new FormData(addressForm)) : null;
     const confirmButton = document.getElementById('confirm-order-btn');
     confirmButton.disabled = true;
-    return DataService.Orders.quote(pendingCheckout.items, couponCode).then((quote) => {
+    const zip = address?.zip || pendingCheckout.zip;
+    return DataService.Orders.quote(pendingCheckout.items, couponCode, zip, pendingCheckout.serviceId).then((quote) => {
       if (requestId !== pendingCheckout.requestId) return;
       pendingCheckout.items = quote.items;
       pendingCheckout.couponCode = quote.couponCode || '';
       pendingCheckout.total = quote.total;
+      pendingCheckout.zip = zip;
+      pendingCheckout.serviceId = quote.shippingServiceId;
+      pendingCheckout.shippingQuoteId = quote.shippingQuoteId;
       renderCheckoutReview(quote.items, quote);
       if (address) {
         for (const [name, value] of Object.entries(address)) {
@@ -103,16 +110,16 @@
     }).catch((err) => {
       if (requestId !== pendingCheckout.requestId) return;
       if (!address) Utils.closeModal('modal-checkout');
-      else confirmButton.disabled = false;
+      else review.insertAdjacentHTML('beforeend', `<p role="alert" class="theme-hint">${Utils.escapeHtml(err.message)}. Corrija o CEP ou tente novamente.</p>`);
       Utils.showToast(err.message, 'error');
     });
   }
 
-  function openCheckout(items, initialCoupon = '') {
+  function openCheckout(items, initialCoupon = '', initialZip = '', initialService = null) {
     const idempotencyKey = global.crypto && global.crypto.randomUUID
       ? global.crypto.randomUUID()
       : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
-    pendingCheckout = { items, total: 0, idempotencyKey, couponCode:initialCoupon, requestId:0 };
+    pendingCheckout = { items, total: 0, idempotencyKey, couponCode:initialCoupon, requestId:0, zip:initialZip, serviceId:initialService, shippingQuoteId:null };
     const confirmButton = document.getElementById('confirm-order-btn');
     if (confirmButton) confirmButton.disabled = true;
     document.getElementById('checkout-step-review').classList.remove('is-hidden');
@@ -153,6 +160,7 @@
     if (confirmBtn?.disabled) return;
     const addressForm = document.getElementById('checkout-address-form');
     if (!addressForm || !addressForm.reportValidity()) return;
+    if (pendingCheckout.shippingQuoteId && addressForm.elements.zip.value.replace(/\D/g,'') !== pendingCheckout.zip.replace(/\D/g,'')) {await requestQuote(pendingCheckout.couponCode);return;}
     if (confirmBtn) confirmBtn.disabled = true;
     try {
       const current = global.App.state.currentUser;
@@ -179,7 +187,9 @@
       items: orderItems,
       idempotencyKey: pendingCheckout.idempotencyKey,
       couponCode: pendingCheckout.couponCode,
-      expectedTotal: pendingCheckout.total
+      expectedTotal: pendingCheckout.total,
+      shippingQuoteId:pendingCheckout.shippingQuoteId,
+      shippingServiceId:pendingCheckout.serviceId
     })
       .then((order) => {
         currentOrder = order;
@@ -345,12 +355,35 @@
       </div>
       <div class="checkout-total-row">
         <span>Total do pedido</span><strong>${Utils.formatCurrency(order.total)}</strong>
-      </div>`;
+      </div>
+      ${order.shippingProvider === 'melhor_envio' ? `<div class="checkout-summary-box"><strong>Transporte: ${Utils.escapeHtml(order.shippingCompany || '')} · ${Utils.escapeHtml(order.shippingService || '')}</strong><p>Prazo informado: ${Utils.escapeHtml(String(order.shippingEstimatedDays || 'indisponível'))} dias úteis. Status do transporte: ${Utils.escapeHtml(order.transportStatus || 'Aguardando postagem')}.</p>${order.trackingCode?`<p>Código de rastreamento: <strong>${Utils.escapeHtml(order.trackingCode)}</strong></p>`:''}<button id="me-refresh-tracking" type="button" class="btn btn--outline btn--sm">Atualizar rastreamento</button>${global.App.state.currentUser?.role==='admin'?`<p>Custo cotado para a loja: ${Utils.formatCurrency(order.shippingCost)}</p><div id="me-shipment-panel">Carregando etiqueta...</div>`:''}</div>`:''}`;
+  }
+
+  async function renderShipment(order){
+    const panel=document.getElementById('me-shipment-panel');if(!panel)return;
+    try{
+      const shipment=await DataService.MelhorEnvio.shipment(order.id);
+      if(!panel.isConnected)return;
+      panel.innerHTML=`<p>Etiqueta: ${Utils.escapeHtml(shipment.state)}${shipment.externalId?` · ID ${Utils.escapeHtml(shipment.externalId)}`:''}</p>${shipment.lastError?`<p role="alert">${Utils.escapeHtml(shipment.lastError)}</p>`:''}
+      ${shipment.state==='not_created'?`<form id="me-create-form" class="form-grid"><p class="form-field--span2 theme-hint">Confirme os dados obrigatórios do destinatário. Quando o serviço exigir nota fiscal, informe a chave da NF-e de 44 dígitos.</p><div class="form-field"><label>E-mail do destinatário<input name="email" type="email" required></label></div><div class="form-field"><label>CPF ou CNPJ<input name="document" required></label></div><div class="form-field"><label>Rua sem número<input name="address" required></label></div><div class="form-field"><label>Número do endereço<input name="number" required></label></div><div class="form-field"><label>Bairro<input name="district" required></label></div><div class="form-field"><label>Complemento<input name="complement"></label></div><div class="form-field"><label>Chave NF-e (se exigida)<input name="invoiceKey" maxlength="44"></label></div><button type="submit" class="btn btn--outline">Criar envio no carrinho do Melhor Envio</button></form>`:''}
+      ${shipment.state==='create_uncertain'?`<form id="me-reconcile-form" class="form-grid"><p class="form-field--span2 theme-hint">Confira no carrinho do Melhor Envio se a etiqueta foi criada. Se foi, informe o ID exibido lá para conferir o serviço e a identificação deste pedido. Não crie outra etiqueta.</p><div class="form-field"><label>ID da etiqueta no carrinho<input name="externalId" required></label></div><button type="submit" class="btn btn--outline">Vincular etiqueta existente</button></form>`:''}
+      ${shipment.state==='cart_added'?`<div class="checkout-summary-box"><p>Custo a contratar: <strong>${Utils.formatCurrency(shipment.cost)}</strong>. Esta ação debita o saldo da sua conta Melhor Envio.</p><label><input type="checkbox" id="me-buy-confirm"> Confirmo a compra da etiqueta por ${Utils.formatCurrency(shipment.cost)}</label><button id="me-buy" type="button" class="btn btn--primary">Comprar frete</button></div>`:''}
+      ${shipment.state==='paid'?'<button id="me-generate" type="button" class="btn btn--primary">Gerar etiqueta</button>':''}
+      ${['generated','printed'].includes(shipment.state)?'<button id="me-print" type="button" class="btn btn--outline">Imprimir etiqueta</button>':''}
+      ${shipment.externalId?'<button id="me-sync" type="button" class="btn btn--outline">Atualizar rastreamento e estado</button>':''}`;
+      async function act(action,body={}){const button=panel.querySelector(`#me-${action}`);if(button)button.disabled=true;try{const result=await DataService.MelhorEnvio.action(order.id,action,body);if(action==='print'){window.open(result.url,'_blank','noopener,noreferrer');}else{Utils.showToast('Operação atualizada.','success');showOrderDetail(order.id);}}catch(err){Utils.showToast(err.message,'error');renderShipment(order);}}
+      panel.querySelector('#me-create-form')?.addEventListener('submit',event=>{event.preventDefault();const form=event.currentTarget;if(form.reportValidity())act('create',Object.fromEntries(new FormData(form)));});
+      panel.querySelector('#me-reconcile-form')?.addEventListener('submit',event=>{event.preventDefault();const form=event.currentTarget;if(form.reportValidity())act('reconcile',Object.fromEntries(new FormData(form)));});
+      panel.querySelector('#me-buy')?.addEventListener('click',()=>{if(!panel.querySelector('#me-buy-confirm').checked){Utils.showToast('Marque a confirmação do custo antes da compra.','warning');return;}act('buy',{confirm:true,confirmedCost:shipment.cost});});
+      ['generate','print','sync'].forEach(action=>panel.querySelector(`#me-${action}`)?.addEventListener('click',()=>act(action)));
+    }catch(err){panel.textContent=err.message;}
   }
 
   function showOrderDetail(orderId) {
     DataService.Orders.getById(orderId).then((order) => {
       document.getElementById('order-detail-content').innerHTML = buildOrderDetailHtml(order);
+      document.getElementById('me-refresh-tracking')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await DataService.MelhorEnvio.tracking(order.id);showOrderDetail(order.id);}catch(err){Utils.showToast(err.message,'error');button.disabled=false;}});
+      if(global.App.state.currentUser?.role==='admin'&&order.shippingProvider==='melhor_envio')renderShipment(order);
       const cancelBtn = document.querySelector('[data-action="cancel-order-detail"]');
       if (cancelBtn) cancelBtn.addEventListener('click', () => {
         if (!confirm('Cancelar este pedido e liberar os itens reservados?')) return;

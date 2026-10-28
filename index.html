@@ -23,7 +23,7 @@
 
   <link rel="stylesheet" href="css/style.css?v=20260928-4">
   <link rel="stylesheet" href="css/improvements.css?v=20260928-4">
-  <link rel="stylesheet" href="css/commerce.css?v=20260928-5">
+  <link rel="stylesheet" href="css/commerce.css?v=20261026-1">
 <script src="js/frameGuard.js?v=20260928-4"></script>
 </head>
 <body>
@@ -620,6 +620,7 @@
         <button class="admin-nav__item" data-admin-tab="produtos">
           <i class="fa-solid fa-boxes-stacked"></i> Produtos
         </button>
+        <button class="admin-nav__item" data-admin-tab="frete"><i class="fa-solid fa-truck"></i> Frete e etiquetas</button>
         <button class="admin-nav__item" data-admin-tab="categorias">
           <i class="fa-solid fa-layer-group"></i> Categorias
         </button>
@@ -929,6 +930,12 @@
           </div>
         </div>
       </div>
+
+      <!-- ---------- CATEGORIAS ---------- -->
+      <div class="admin-tab-panel" data-tab-panel="frete"><div class="panel-card"><div class="panel-card__header"><h2>Melhor Envio</h2><button id="me-connect" type="button" class="btn btn--primary btn--sm">Conectar conta</button></div><p id="me-status" role="status"></p><h3>Remetente e origem</h3><form id="me-sender" class="form-grid">
+        <div class="form-field"><label>Nome<input name="name" required></label></div><div class="form-field"><label>E-mail<input name="email" type="email" required></label></div><div class="form-field"><label>Telefone<input name="phone" required></label></div><div class="form-field"><label>CPF (pessoa física)<input name="document"></label></div><div class="form-field"><label>CNPJ (pessoa jurídica)<input name="company_document"></label></div><div class="form-field"><label>Inscrição estadual (se aplicável)<input name="state_register"></label></div><div class="form-field"><label>CNAE (7 dígitos, necessário para LATAM PJ)<input name="economic_activity_code"></label></div>
+        <div class="form-field"><label>Rua<input name="address" required></label></div><div class="form-field"><label>Número<input name="number" required></label></div><div class="form-field"><label>Complemento<input name="complement"></label></div><div class="form-field"><label>Bairro<input name="district" required></label></div><div class="form-field"><label>Cidade<input name="city" required></label></div><div class="form-field"><label>UF<input name="state_abbr" maxlength="2" required></label></div><div class="form-field"><label>CEP de origem<input name="postal_code" required></label></div>
+        <div class="form-field form-field--span2"><button class="btn btn--primary" type="submit">Salvar remetente</button></div></form><h3>Produtos sem medidas para cotação</h3><div id="me-missing-products" class="theme-hint"></div></div></div>
 
       <!-- ---------- CATEGORIAS ---------- -->
       <div class="admin-tab-panel" data-tab-panel="categorias">
@@ -1250,12 +1257,17 @@
       </div>
       <div id="cart-items-list" class="cart-items-list"></div>
       <div id="cart-order-extras" class="cart-order-extras is-hidden">
+        <form id="cart-zip-form" class="checkout-coupon-form is-hidden">
+          <label for="cart-zip">Calcular frete pelo CEP</label>
+          <div><input id="cart-zip" inputmode="numeric" autocomplete="postal-code" maxlength="9" placeholder="00000-000"><button class="btn btn--outline btn--sm" type="submit">Calcular</button></div>
+        </form>
         <form id="cart-coupon-form" class="checkout-coupon-form">
           <label for="cart-coupon-code">Tem um cupom? Aplique aqui</label>
           <div><input id="cart-coupon-code" type="text" maxlength="32" autocomplete="off" placeholder="Código do cupom"><button class="btn btn--outline btn--sm" type="submit">Aplicar</button><button id="cart-coupon-remove" class="btn btn--ghost btn--sm is-hidden" type="button">Remover</button></div>
           <p id="cart-coupon-message" class="theme-hint" role="status"></p>
         </form>
         <div id="cart-costs" class="checkout-costs" aria-live="polite"></div>
+        <div id="cart-shipping-options" class="shipping-options" role="group" aria-label="Opções de frete"></div>
       </div>
     </div>
 
@@ -1402,6 +1414,11 @@
             <input id="prod-margin" name="profitMargin" readonly placeholder="Informe o custo" aria-describedby="prod-price-help">
           </div>
           <p id="prod-price-help" class="form-field--span2 theme-hint">Margem = (preço cobrado − custo) ÷ preço cobrado × 100. Não inclui frete, impostos ou outras despesas.</p>
+          <p class="form-field--span2 theme-hint">Embalagem por unidade: informe peso e dimensões do produto já embalado. Todos os campos são necessários para a cotação real; produtos antigos permanecem sem medidas até serem editados.</p>
+          <div class="form-field"><label for="prod-weight">Peso embalado (kg)</label><input id="prod-weight" name="shippingWeightKg" type="number" min="0.001" max="300" step="0.001"></div>
+          <div class="form-field"><label for="prod-height">Altura embalada (cm)</label><input id="prod-height" name="shippingHeightCm" type="number" min="0.1" max="200" step="0.1"></div>
+          <div class="form-field"><label for="prod-width">Largura embalada (cm)</label><input id="prod-width" name="shippingWidthCm" type="number" min="0.1" max="200" step="0.1"></div>
+          <div class="form-field"><label for="prod-length">Comprimento embalado (cm)</label><input id="prod-length" name="shippingLengthCm" type="number" min="0.1" max="200" step="0.1"></div>
 
           <div class="form-field">
             <label for="prod-category">Categoria</label>
@@ -1479,7 +1496,7 @@
      SCRIPTS (ordem importa: dataService/utils primeiro, app.js por último)
 ============================================================= -->
 <script src="js/apiConfig.js?v=20260928-4"></script>
-<script src="js/dataService.js?v=20260928-4"></script>
+<script src="js/dataService.js?v=20261026-1"></script>
 <script src="js/utils.js?v=20260928-4"></script>
 <script src="js/auth.js?v=20260928-4"></script>
 <script src="js/siteContent.js?v=20260928-4"></script>
@@ -1488,13 +1505,14 @@
 <script src="js/products.js?v=20260928-4"></script>
 <script src="js/productMedia.js?v=20260928-4"></script>
 <script src="js/productDetail.js?v=20260928-4"></script>
-<script src="js/cart.js?v=20260928-5"></script>
-<script src="js/orders.js?v=20260928-4"></script>
+<script src="js/cart.js?v=20261026-1"></script>
+<script src="js/orders.js?v=20261026-1"></script>
 <script src="js/customerArea.js?v=20260928-4"></script>
 <script src="js/adminReports.js?v=20260928-4"></script>
 <script src="js/adminCosts.js?v=20260928-4"></script>
 <script src="js/adminPromotions.js?v=20260928-4"></script>
-<script src="js/adminPanel.js?v=20260928-4"></script>
+<script src="js/adminPanel.js?v=20261026-1"></script>
+<script src="js/adminShipping.js?v=20261026-1"></script>
 <script src="js/app.js?v=20260928-4"></script>
 
 </body>

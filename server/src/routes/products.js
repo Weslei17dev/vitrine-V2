@@ -20,6 +20,7 @@ function toPublicProduct(row) {
     category: row.category,
     icon: row.icon,
     color: row.color,
+    shippingReady: ['shipping_weight_kg','shipping_height_cm','shipping_width_cm','shipping_length_cm'].every(key=>Number(row[key])>0),
     colors: Array.isArray(row.colors) ? row.colors : [],
     stock: row.stock,
     active: row.active,
@@ -36,6 +37,10 @@ function toPublicProduct(row) {
 function toAdminProduct(row) {
   const cost = row.cost_price == null ? null : Number(row.cost_price);
   return { ...toPublicProduct(row), costPrice: cost,
+    shippingWeightKg:row.shipping_weight_kg==null?null:Number(row.shipping_weight_kg),
+    shippingHeightCm:row.shipping_height_cm==null?null:Number(row.shipping_height_cm),
+    shippingWidthCm:row.shipping_width_cm==null?null:Number(row.shipping_width_cm),
+    shippingLengthCm:row.shipping_length_cm==null?null:Number(row.shipping_length_cm),
     profitMargin: cost == null ? null : ((Number(row.price) - cost) / Number(row.price)) * 100 };
 }
 
@@ -48,6 +53,12 @@ function toProductSummary(row) {
 }
 
 function validateProduct(body) {
+  const dimension=(value,label,max)=>{
+    if(value==null||value==='')return null;
+    const n=Number(value);
+    if(!Number.isFinite(n)||n<=0||n>max)throw new V.ValidationError(`${label} inválido. Informe um valor positivo até ${max}.`);
+    return n;
+  };
   const gallery = Array.isArray(body.gallery) ? body.gallery : [];
   const rawColors = Array.isArray(body.colors) ? body.colors : [];
   if (rawColors.length > 12) throw new V.ValidationError('Cadastre no máximo 12 cores por produto.');
@@ -72,6 +83,10 @@ function validateProduct(body) {
     icon: V.text(body.icon || '🛍️', 'Ícone', { max: 8 }),
     color: V.color(body.color || '#D99163'),
     colors,
+    shippingWeightKg:dimension(body.shippingWeightKg,'Peso (kg)',300),
+    shippingHeightCm:dimension(body.shippingHeightCm,'Altura (cm)',200),
+    shippingWidthCm:dimension(body.shippingWidthCm,'Largura (cm)',200),
+    shippingLengthCm:dimension(body.shippingLengthCm,'Comprimento (cm)',200),
     stock: V.nonNegativeInteger(body.stock == null ? 0 : body.stock, 'Estoque'),
     active: body.active !== false,
     image: V.imageSource(body.image, 'Imagem principal'),
@@ -155,9 +170,9 @@ router.post('/', requireAdmin, async (req, res, next) => {
     const p = validateProduct(req.body || {});
     await pool.query('INSERT INTO categories (name,color) VALUES ($1,$2) ON CONFLICT (name) DO NOTHING', [p.category, p.color]);
     const result = await pool.query(
-      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details, cost_price, colors)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14::jsonb) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, p.costPrice, JSON.stringify(p.colors)]
+      `INSERT INTO products (name, description, price, compare_at_price, category, icon, color, stock, active, image, gallery, details, cost_price, colors, shipping_weight_kg,shipping_height_cm,shipping_width_cm,shipping_length_cm)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14::jsonb,$15,$16,$17,$18) RETURNING *`,
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, p.costPrice, JSON.stringify(p.colors),p.shippingWeightKg,p.shippingHeightCm,p.shippingWidthCm,p.shippingLengthCm]
     );
     await recordAudit(pool, {
       adminId: req.user.id, action: 'product.create', entityType: 'product', entityId: result.rows[0].id,
@@ -177,9 +192,10 @@ router.put('/:id', requireAdmin, async (req, res, next) => {
     const expectedUpdatedAt = V.timestamp(req.body && req.body.updatedAt);
     const result = await pool.query(
       `UPDATE products SET name=$1, description=$2, price=$3, compare_at_price=$4, category=$5, icon=$6, color=$7,
-         stock=$8, active=$9, image=$10, gallery=$11::jsonb, details=$12, cost_price=$15, colors=$16::jsonb, updated_at=now()
+         stock=$8, active=$9, image=$10, gallery=$11::jsonb, details=$12, cost_price=$15, colors=$16::jsonb,
+         shipping_weight_kg=$17,shipping_height_cm=$18,shipping_width_cm=$19,shipping_length_cm=$20,updated_at=now()
        WHERE id=$13 AND date_trunc('milliseconds', updated_at)=date_trunc('milliseconds', $14::timestamptz) RETURNING *`,
-      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, id, expectedUpdatedAt, p.costPrice, JSON.stringify(p.colors)]
+      [p.name, p.description, p.price, p.compareAtPrice, p.category, p.icon, p.color, p.stock, p.active, p.image, JSON.stringify(p.gallery), p.details, id, expectedUpdatedAt, p.costPrice, JSON.stringify(p.colors),p.shippingWeightKg,p.shippingHeightCm,p.shippingWidthCm,p.shippingLengthCm]
     );
     if (!result.rows[0]) {
       const exists = await pool.query('SELECT 1 FROM products WHERE id=$1', [id]);

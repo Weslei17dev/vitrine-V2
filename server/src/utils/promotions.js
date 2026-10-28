@@ -57,7 +57,7 @@ async function readCoupon(database, code, { lock = false } = {}) {
   return coupon;
 }
 
-async function priceOrder(database, requestedItems, products, couponCode, shippingForSubtotal, { lockCoupon = false } = {}) {
+async function priceOrder(database, requestedItems, products, couponCode, shippingForSubtotal, { lockCoupon = false, freeAboveCents = 0 } = {}) {
   const rules = await activeAutomatic(database);
   const coupon = await readCoupon(database, couponCode, { lock: lockCoupon });
   const priced = products.map((product) => priceForProduct(product, rules));
@@ -87,7 +87,7 @@ async function priceOrder(database, requestedItems, products, couponCode, shippi
   }
   const subtotalCents = calculated.subtotalCents - couponCents;
   const baseShippingCents = shippingForSubtotal(subtotalCents);
-  if (coupon?.discount_type === 'free_shipping') shippingDiscountCents = baseShippingCents;
+  if (coupon?.discount_type === 'free_shipping' || (freeAboveCents > 0 && subtotalCents >= freeAboveCents)) shippingDiscountCents = baseShippingCents;
   const shippingCents = baseShippingCents - shippingDiscountCents;
   if (subtotalCents + shippingCents > 9999999999) throw new ValidationError('O valor total do pedido ultrapassa o limite permitido.');
   return {

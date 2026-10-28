@@ -56,6 +56,7 @@ app.use('/api/products', require('./routes/products'));
 app.use('/api/promotions', require('./routes/promotions'));
 app.use('/api/categories', require('./routes/categories'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/melhor-envio', require('./routes/melhorEnvio'));
 app.use('/api/customers', require('./routes/customers'));
 app.use('/api/site-content', require('./routes/siteContent'));
 app.use('/api/reviews', require('./routes/reviews'));
@@ -66,8 +67,8 @@ app.use((req, res) => res.status(404).json({ message: 'Rota não encontrada.' })
 
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
-  console.error(err);
   const status = Number(err.status) || (err.type === 'entity.too.large' ? 413 : 500);
+  console.error('[api]', status, err.code || err.name || 'error');
   const publicMessage = status < 500 ? err.message : 'Erro interno do servidor.';
   res.status(status).json({ message: publicMessage, ...(err.code ? { code: err.code } : {}) });
 });
