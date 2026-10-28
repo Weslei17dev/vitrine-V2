@@ -12,6 +12,19 @@ const db={query:async()=>({rows:[]}),connect:async()=>({query:db.query,release()
 require.cache[dbPath]={id:dbPath,filename:dbPath,loaded:true,exports:db};
 const me=require('../src/utils/melhorEnvio');
 const product={id:'11',name:'Produto',price:42,shipping_weight_kg:0.35,shipping_height_cm:8,shipping_width_cm:12,shipping_length_cm:20};
+test('OAuth pode ficar habilitado sem ativar frete real no checkout',()=>{
+  const previous=process.env.ME_CHECKOUT_ENABLED;
+  try {
+    delete process.env.ME_CHECKOUT_ENABLED;
+    assert.equal(me.enabled(),true);
+    assert.equal(me.checkoutEnabled(),false);
+    process.env.ME_CHECKOUT_ENABLED='true';
+    assert.equal(me.checkoutEnabled(),true);
+  } finally {
+    if(previous===undefined)delete process.env.ME_CHECKOUT_ENABLED;
+    else process.env.ME_CHECKOUT_ENABLED=previous;
+  }
+});
 test('envia dimensões unitárias e quantidades por produto',()=>{
   const rows=[product,{...product,id:'22',name:'Outro',shipping_weight_kg:1.2}];
   const payload=me.productsPayload([{productId:'11',qty:3},{productId:'22',qty:2}],rows);
