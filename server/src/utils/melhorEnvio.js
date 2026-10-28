@@ -6,6 +6,7 @@ const V = require('../validation');
 
 const environment = process.env.ME_ENVIRONMENT || 'disabled';
 const enabled = () => environment === 'sandbox' || environment === 'production';
+const checkoutEnabled = () => enabled() && process.env.ME_CHECKOUT_ENABLED === 'true';
 const baseUrl = () => environment === 'production' ? 'https://melhorenvio.com.br' : 'https://sandbox.melhorenvio.com.br';
 const scopes = 'shipping-calculate cart-read cart-write orders-read shipping-checkout shipping-generate shipping-print shipping-tracking';
 const bad = (message, status = 400, code) => Object.assign(new Error(message), {status, code});
@@ -142,4 +143,4 @@ async function calculate(items,rows,zip,sender) {
   if(!options.length)throw bad('Nenhum serviço de entrega disponível para este CEP e carrinho.',422,'no_shipping_services');
   return options;
 }
-module.exports={environment,enabled,configured,cartHash,start,finish,request,calculate,accessToken,bad,normalizedOptions,productsPayload,volumesFromPackages};
+module.exports={environment,enabled,checkoutEnabled,configured,cartHash,start,finish,request,calculate,accessToken,bad,normalizedOptions,productsPayload,volumesFromPackages};
