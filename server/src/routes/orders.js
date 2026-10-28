@@ -14,7 +14,7 @@ const { recordAudit } = require('../utils/audit');
 const me = require('../utils/melhorEnvio');
 
 const router = express.Router();
-router.get('/shipping-mode', (_req,res)=>res.json({mode:me.enabled()?'melhor_envio':'example'}));
+router.get('/shipping-mode', (_req,res)=>res.json({mode:me.checkoutEnabled()?'melhor_envio':'example'}));
 
 const STATUS_FLOW = ['Aguardando Pagamento', 'Aguardando Confirmação', 'Pago', 'Em Produção', 'Enviado', 'Finalizado'];
 const STATUS_CANCELLED = 'Cancelado';
@@ -140,7 +140,7 @@ router.post('/quote', orderLimiter, async (req, res, next) => {
     if (productsResult.rows.length !== new Set(productIds).size) throw new V.ValidationError('Um dos produtos não está mais disponível.');
     const content = await readStoreContent();
     let shippingOptions=[], chosen=null, quoteId=null, zip=null;
-    if(me.enabled()) {
+    if(me.checkoutEnabled()) {
       zip=V.zip(req.body?.zip);
       // A regra comercial é calculada primeiro, mas o custo do frete sempre vem da API externa.
       await priceOrder(pool,requestedItems,productsResult.rows,couponCode,()=>0);
@@ -169,7 +169,7 @@ router.post('/quote', orderLimiter, async (req, res, next) => {
       shippingTotal: calculated.shippingCents / 100,
       total: calculated.totalCents / 100,
       estimatedDays: chosen ? chosen.days : Number(content.shipping && content.shipping.estimatedDays) || 7
-      ,shippingMode:me.enabled()?'melhor_envio':'example',zip,
+      ,shippingMode:me.checkoutEnabled()?'melhor_envio':'example',zip,
       shippingQuoteId:quoteId,shippingServiceId:chosen?.id||null,
       shippingCompany:chosen?.company||null,shippingService:chosen?.service||null,
       shippingCost:chosen?.cost||null,shippingOptions,
@@ -235,7 +235,7 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
 
     const content = await readStoreContent(client);
     let chosen=null,quoteRow=null;
-    if(me.enabled()) {
+    if(me.checkoutEnabled()) {
       const requestedQuote=V.uuid(req.body?.shippingQuoteId,'Cotação');
       quoteRow=(await client.query('SELECT * FROM me_shipping_quotes WHERE id=$1 AND expires_at>now() AND environment=$2 FOR UPDATE',[requestedQuote,me.environment])).rows[0];
       if(!quoteRow||quoteRow.cart_hash!==me.cartHash(requestedItems,couponCode)||quoteRow.zip!==V.zip(user.zip)||(quoteRow.user_id&&quoteRow.user_id!==req.user.id)) {
@@ -257,7 +257,7 @@ router.post('/', requireAuth, orderLimiter, async (req, res, next) => {
     const subtotalCents = calculated.subtotalCents;
     const shippingCents = calculated.shippingCents;
     const total = calculated.totalCents / 100;
-    if ((me.enabled() && req.body?.expectedTotal == null) || (req.body?.expectedTotal != null && Math.round(V.nonNegativeMoney(req.body.expectedTotal, 'Valor confirmado') * 100) !== calculated.totalCents)) {
+    if ((me.checkoutEnabled() && req.body?.expectedTotal == null) || (req.body?.expectedTotal != null && Math.round(V.nonNegativeMoney(req.body.expectedTotal, 'Valor confirmado') * 100) !== calculated.totalCents)) {
       const error = new Error('O valor do pedido mudou. Confira o novo total antes de confirmar.');
       error.status = 409;
       error.code = 'quote_changed';
