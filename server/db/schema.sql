@@ -355,3 +355,4 @@ ALTER TABLE public.me_oauth_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.me_oauth_states ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.me_shipping_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.me_shipments ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE public.me_settings, public.me_oauth_tokens, public.me_oauth_states, public.me_shipping_quotes, public.me_shipments FROM anon, authenticated;
